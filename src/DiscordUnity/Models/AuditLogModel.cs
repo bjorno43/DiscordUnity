@@ -137,7 +137,7 @@ namespace DiscordUnity.Models
         public bool Nsfw { get; set; }
         public string ApplicationId { get; set; }
         public int RateLimitPerUser { get; set; }
-        public int Permissions { get; set; }
+        public ulong Permissions { get; set; }
         public int Color { get; set; }
         public bool Hoist { get; set; }
         public bool Mentionable { get; set; }

@@ -5,6 +5,7 @@ namespace DiscordUnity.Models
     internal class IdentityModel
     {
         public string Token { get; set; }
+        public long Intents { get; set; }
         public Dictionary<string, string> Properties { get; set; }
     }
 }

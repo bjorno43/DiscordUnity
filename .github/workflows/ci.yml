@@ -1,0 +1,36 @@
+name: Build and regression tests
+
+on:
+  push:
+    branches: [master, 'codex/**']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          dotnet-version: '8.0.x'
+      - name: Restore
+        run: dotnet restore src/DiscordUnity.sln --configfile NuGet.Config
+      - name: Build library and test hosts
+        run: dotnet build src/DiscordUnity.sln -c Release --no-restore
+      - name: Run offline tests on .NET 8
+        run: dotnet src/DiscordUnityTests/bin/Release/net8.0/DiscordUnityTests.dll
+      - name: Run offline tests on .NET Framework
+        run: ./src/DiscordUnityTests/bin/Release/net472/DiscordUnityTests.exe
+      - name: Package runtime and source
+        run: python scripts/package.py
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: DiscordUnity-UnityMono
+          path: artifacts/*.zip
+          if-no-files-found: error

@@ -10,7 +10,7 @@ namespace DiscordUnity.State
     {
         public string Id { get; internal set; }
         public ChannelType Type { get; internal set; }
-        public DiscordServer Server => string.IsNullOrEmpty(GuildId) ? null : DiscordAPI.Servers[GuildId];
+        public DiscordServer Server => DiscordAPI.FindServer(GuildId);
         public int? Position { get; internal set; }
         public DiscordOverwrite[] PermissionOverwrites { get; internal set; }
         public string Name { get; internal set; }
@@ -27,7 +27,7 @@ namespace DiscordUnity.State
         public DiscordChannel Parent { get; internal set; }
         public DateTime? LastPinTimestamp { get; internal set; }
 
-        private readonly string GuildId;
+        public string GuildId { get; }
 
         internal DiscordChannel(ChannelModel model)
         {
@@ -35,29 +35,34 @@ namespace DiscordUnity.State
             Type = model.Type;
             GuildId = model.GuildId;
             Position = model.Position;
+            Name = model.Name;
+            PermissionOverwrites = model.PermissionOverwrites?.Select(x => new DiscordOverwrite(x)).ToArray();
             Topic = model.Topic;
             Nsfw = model.Nsfw;
             LastMessageId = model.LastMessageId;
             Bitrate = model.Bitrate;
             UserLimit = model.UserLimit;
             RateLimitPerUser = model.RateLimitPerUser;
-            Recipients = model.Recipients?.ToDictionary(x => x.Id, x => new DiscordUser(x));
+            Recipients = model.Recipients?.ToDictionary(x => x.Id, x => new DiscordUser(x)) ?? new Dictionary<string, DiscordUser>();
             Icon = model.Icon;
-            Owner = Recipients?[model.OwnerId];
+            if (model.OwnerId != null && Recipients.TryGetValue(model.OwnerId, out var owner)) Owner = owner;
             ApplicationId = model.ApplicationId;
             LastPinTimestamp = model.LastPinTimestamp;
         }
 
         public Task<RestResult<DiscordMessage>> CreateMessage(string content, string nonce, bool? tts, object file, object embed, string payload_json, object allowed_mentions)
             => DiscordAPI.CreateMessage(Id, content, nonce, tts, file, embed, payload_json, allowed_mentions);
+
+        public Task<RestResult<DiscordMessage>> CreateMessage(string content)
+            => DiscordAPI.CreateMessage(Id, content);
     }
 
     public class DiscordOverwrite
     {
         public string Id { get; internal set; }
-        public string Type { get; internal set; }
-        public int Allow { get; internal set; }
-        public int Deny { get; internal set; }
+        public int Type { get; internal set; }
+        public ulong Allow { get; internal set; }
+        public ulong Deny { get; internal set; }
 
         internal DiscordOverwrite(OverwriteModel model)
         {

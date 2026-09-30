@@ -6,6 +6,8 @@ namespace DiscordUnity.State
     {
         public string Id { get; internal set; }
         public string Username { get; internal set; }
+        public string GlobalName { get; internal set; }
+        public string DisplayName => GlobalName ?? Username;
         public string Discriminator { get; internal set; }
         public string Avatar { get; internal set; }
         public bool? Bot { get; internal set; }
@@ -22,6 +24,7 @@ namespace DiscordUnity.State
         {
             Id = model.Id;
             Username = model.Username;
+            GlobalName = model.GlobalName;
             Discriminator = model.Discriminator;
             Avatar = model.Avatar;
             Bot = model.Bot;

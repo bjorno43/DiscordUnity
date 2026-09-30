@@ -7,7 +7,7 @@ namespace DiscordUnity.Models
         public string Name { get; set; }
         public ActivityType Type { get; set; }
         public string Url { get; set; }
-        public int CreatedAt { get; set; }
+        public long CreatedAt { get; set; }
         public ActivityTimestampsModel Timestamps { get; set; }
         public string ApplicationId { get; set; }
         public string Details { get; set; }
@@ -41,8 +41,8 @@ namespace DiscordUnity.Models
 
     internal class ActivityTimestampsModel
     {
-        public int Start { get; set; }
-        public int End { get; set; }
+        public long Start { get; set; }
+        public long End { get; set; }
     }
 
     internal class ActivityEmojiModel

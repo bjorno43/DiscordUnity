@@ -7,9 +7,9 @@ namespace DiscordUnity.State
     public class DiscordPresence
     {
         public DiscordUser User { get; internal set; }
-        public DiscordRole[] Roles => RoleIds?.Select(x => Server.Roles[x]).ToArray();
+        public DiscordRole[] Roles => Server == null ? new DiscordRole[0] : RoleIds?.Where(x => Server.Roles.ContainsKey(x)).Select(x => Server.Roles[x]).ToArray();
         public DiscordActivity Game { get; internal set; }
-        public DiscordServer Server => DiscordAPI.Servers[GuildId];
+        public DiscordServer Server => DiscordAPI.FindServer(GuildId);
         public PresenceStatus Status { get; internal set; }
         public DiscordActivity[] Activities { get; internal set; }
         public DiscordClientStatus ClientStatus { get; internal set; }

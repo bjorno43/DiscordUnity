@@ -4,8 +4,8 @@ namespace DiscordUnity.State
 {
     public class DiscordVoiceState
     {
-        public DiscordServer Server => string.IsNullOrEmpty(GuildId) ? null : DiscordAPI.Servers[GuildId];
-        public DiscordChannel Channel => string.IsNullOrEmpty(GuildId) ? DiscordAPI.PrivateChannels[ChannelId] : Server.Channels[ChannelId];
+        public DiscordServer Server => DiscordAPI.FindServer(GuildId);
+        public DiscordChannel Channel => DiscordAPI.FindChannel(GuildId, ChannelId);
         public DiscordUser User { get; internal set; }
         public DiscordServerMember Member { get; internal set; }
         public string SessionId { get; internal set; }
@@ -23,8 +23,12 @@ namespace DiscordUnity.State
         {
             GuildId = model.GuildId;
             ChannelId = model.ChannelId;
-            User = Channel.Recipients[model.UserId];
-            if (model.Member != null) Member = new DiscordServerMember(model.Member);
+            if (model.Member != null)
+            {
+                model.Member.GuildId = model.GuildId;
+                Member = new DiscordServerMember(model.Member);
+            }
+            User = Member?.User ?? new DiscordUser(new UserModel { Id = model.UserId });
             SessionId = model.SessionId;
             Deaf = model.Deaf;
             Mute = model.Mute;

@@ -10,6 +10,7 @@ namespace DiscordUnity.Models
         public ChannelModel[] PrivateChannels { get; set; }
         public GuildModel[] Guilds { get; set; }
         public string SessionId { get; set; }
+        public string ResumeGatewayUrl { get; set; }
         public int[] Shard { get; set; }
     }
 }

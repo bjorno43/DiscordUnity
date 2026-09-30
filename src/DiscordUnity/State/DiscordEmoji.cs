@@ -8,6 +8,7 @@ namespace DiscordUnity.State
         public string Id { get; internal set; }
         public string Name { get; internal set; }
         public DiscordRole[] Roles { get; internal set; }
+        public string[] RoleIds { get; internal set; }
         public DiscordUser User { get; internal set; }
         public bool? RequireColons { get; internal set; }
         public bool? Managed { get; internal set; }
@@ -18,7 +19,8 @@ namespace DiscordUnity.State
         {
             Id = model.Id;
             Name = model.Name;
-            Roles = model.Roles?.Select(x => new DiscordRole(x)).ToArray();
+            RoleIds = model.Roles;
+            Roles = model.Roles?.Select(x => new DiscordRole(new RoleModel { Id = x })).ToArray();
             if (model.User != null) User = new DiscordUser(model.User);
             RequireColons = model.RequireColons;
             Managed = model.Managed;

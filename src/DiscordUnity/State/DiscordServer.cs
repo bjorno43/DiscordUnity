@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Newtonsoft.Json.Linq;
 
 namespace DiscordUnity.State
 {
@@ -14,7 +15,7 @@ namespace DiscordUnity.State
         public string DiscoverySplash { get; internal set; }
         public bool IsOwner { get; internal set; }
         public DiscordServerMember Owner { get; internal set; }
-        public int? Permissions { get; internal set; }
+        public ulong? Permissions { get; internal set; }
         public string Region { get; internal set; }
         public DiscordChannel AfkChannel { get; internal set; }
         public int AfkTimeout { get; internal set; }
@@ -26,6 +27,7 @@ namespace DiscordUnity.State
         public Dictionary<string, DiscordRole> Roles { get; internal set; }
         public Dictionary<string, DiscordEmoji> Emojis { get; internal set; }
         public GuildFeature[] Features { get; internal set; }
+        public string[] FeatureNames { get; internal set; }
         public int MfaLevel { get; internal set; }
         public string ApplicationId { get; internal set; }
         public bool WidgetEnabled { get; internal set; }
@@ -55,43 +57,51 @@ namespace DiscordUnity.State
         public int ApproximatePresenceCount { get; internal set; }
         public Dictionary<string, DiscordInvite> Invites { get; internal set; }
         public Dictionary<string, DiscordUser> Bans { get; internal set; }
+        private JObject snapshot;
 
         internal DiscordServer(GuildModel model)
         {
+            snapshot = JObject.FromObject(model, DiscordAPI.JsonSerializer);
             Id = model.Id;
             Name = model.Name;
             Icon = model.Icon;
             Splash = model.Splash;
             DiscoverySplash = model.DiscoverySplash;
             IsOwner = model.Owner ?? false;
-            Roles = model.Roles?.ToDictionary(x => x.Id, x => new DiscordRole(x));
-            Members = model.Members?.ToDictionary(x => x.User.Id, x => new DiscordServerMember(x));
-            if (!string.IsNullOrEmpty(model.OwnerId)) Owner = Members[model.OwnerId];
+            Roles = model.Roles?.ToDictionary(x => x.Id, x => new DiscordRole(x)) ?? new Dictionary<string, DiscordRole>();
+            if (model.Members != null) foreach (var member in model.Members) member.GuildId = model.Id;
+            Members = model.Members?.Where(x => x.User != null).ToDictionary(x => x.User.Id, x => new DiscordServerMember(x)) ?? new Dictionary<string, DiscordServerMember>();
+            if (model.OwnerId != null && Members.TryGetValue(model.OwnerId, out var owner)) Owner = owner;
             Permissions = model.Permissions;
             Region = model.Region;
-            Channels = model.Channels?.ToDictionary(x => x.Id, x => new DiscordChannel(x));
-            if (!string.IsNullOrEmpty(model.AfkChannelId)) AfkChannel = Channels[model.AfkChannelId];
+            var channelModels = (model.Channels ?? new ChannelModel[0]).Concat(model.Threads ?? new ChannelModel[0]);
+            foreach (var channel in channelModels) channel.GuildId = model.Id;
+            Channels = channelModels.GroupBy(x => x.Id).ToDictionary(x => x.Key, x => new DiscordChannel(x.Last()));
+            AfkChannel = LookupChannel(model.AfkChannelId);
             AfkTimeout = model.AfkTimeout;
             EmbedEnabled = model.EmbedEnabled ?? false;
-            if (!string.IsNullOrEmpty(model.EmbedChannelId)) EmbedChannel = Channels[model.EmbedChannelId];
+            EmbedChannel = LookupChannel(model.EmbedChannelId);
             VerificationLevel = model.VerificationLevel;
             DefaultMessageNotifications = model.DefaultMessageNotifications;
             ExplicitContentFilter = model.ExplicitContentFilter;
-            Emojis = model.Emojis?.ToDictionary(x => x.Id, x => new DiscordEmoji(x));
-            Features = model.Features;
+            Emojis = model.Emojis?.ToDictionary(x => x.Id, x => new DiscordEmoji(x)) ?? new Dictionary<string, DiscordEmoji>();
+            FeatureNames = model.Features ?? new string[0];
+            Features = FeatureNames.Where(x => Enum.IsDefined(typeof(GuildFeature), x)).Select(x => (GuildFeature)Enum.Parse(typeof(GuildFeature), x)).ToArray();
             MfaLevel = model.MfaLevel;
             ApplicationId = model.ApplicationId;
             WidgetEnabled = model.WidgetEnabled ?? false;
-            if (!string.IsNullOrEmpty(model.WidgetChannelId)) WidgetChannel = Channels[model.WidgetChannelId];
-            if (!string.IsNullOrEmpty(model.SystemChannelId)) SystemChannel = Channels[model.SystemChannelId];
+            WidgetChannel = LookupChannel(model.WidgetChannelId);
+            SystemChannel = LookupChannel(model.SystemChannelId);
             SystemChannelFlags = model.SystemChannelFlags;
-            if (!string.IsNullOrEmpty(model.RulesChannelId)) RulesChannel = Channels[model.RulesChannelId];
+            RulesChannel = LookupChannel(model.RulesChannelId);
             JoinedAt = model.JoinedAt;
             Large = model.Large ?? false;
             Unavailable = model.Unavailable ?? false;
             MemberCount = model.MemberCount;
-            VoiceStates = model.VoiceStates?.ToDictionary(x => x.Member.User.Id, x => new DiscordVoiceState(x));
-            Presences = model.Presences?.ToDictionary(x => x.User.Id, x => new DiscordPresence(x));
+            if (model.VoiceStates != null) foreach (var voice in model.VoiceStates) voice.GuildId = model.Id;
+            VoiceStates = model.VoiceStates?.ToDictionary(x => x.UserId, x => new DiscordVoiceState(x)) ?? new Dictionary<string, DiscordVoiceState>();
+            if (model.Presences != null) foreach (var presence in model.Presences) presence.GuildId = model.Id;
+            Presences = model.Presences?.ToDictionary(x => x.User.Id, x => new DiscordPresence(x)) ?? new Dictionary<string, DiscordPresence>();
             MaxPresences = model.MaxPresences;
             MaxMembers = model.MaxMembers;
             VanityUrlCode = model.VanityUrlCode;
@@ -100,7 +110,7 @@ namespace DiscordUnity.State
             PremiumTier = model.PremiumTier;
             PremiumSubscriptionCount = model.PremiumSubscriptionCount;
             PreferredLocale = model.PreferredLocale;
-            if (!string.IsNullOrEmpty(model.PublicUpdatesChannelId)) PublicUpdatesChannel = Channels[model.PublicUpdatesChannelId];
+            PublicUpdatesChannel = LookupChannel(model.PublicUpdatesChannelId);
             MaxVideoChannelUsers = model.MaxVideoChannelUsers;
             ApproximateMemberCount = model.ApproximateMemberCount;
             ApproximatePresenceCount = model.ApproximatePresenceCount;
@@ -110,16 +120,44 @@ namespace DiscordUnity.State
             if (model.Channels != null)
                 foreach (var channel in model.Channels)
                     if (!string.IsNullOrEmpty(channel.ParentId))
-                        Channels[channel.Id].Parent = Channels[channel.ParentId];
+                        Channels[channel.Id].Parent = LookupChannel(channel.ParentId);
         }
+
+        private DiscordChannel LookupChannel(string id) => id != null && Channels.TryGetValue(id, out var channel) ? channel : null;
+
+        internal DiscordServer WithUpdate(JObject partial)
+        {
+            var merged = (JObject)snapshot.DeepClone();
+            merged.Merge(partial, new JsonMergeSettings { MergeArrayHandling = MergeArrayHandling.Replace, MergeNullValueHandling = MergeNullValueHandling.Merge });
+            var updated = new DiscordServer(merged.ToObject<GuildModel>(DiscordAPI.JsonSerializer));
+            if (partial["channels"] == null) updated.Channels = Channels;
+            if (partial["members"] == null) updated.Members = Members;
+            if (partial["roles"] == null) updated.Roles = Roles;
+            if (partial["emojis"] == null) updated.Emojis = Emojis;
+            if (partial["voice_states"] == null) updated.VoiceStates = VoiceStates;
+            if (partial["presences"] == null) updated.Presences = Presences;
+            updated.Invites = Invites;
+            updated.Bans = Bans;
+            updated.Owner = modelOwner(merged, updated.Members);
+            updated.AfkChannel = updated.LookupChannel((string)merged["afk_channel_id"]);
+            updated.EmbedChannel = updated.LookupChannel((string)merged["embed_channel_id"]);
+            updated.WidgetChannel = updated.LookupChannel((string)merged["widget_channel_id"]);
+            updated.SystemChannel = updated.LookupChannel((string)merged["system_channel_id"]);
+            updated.RulesChannel = updated.LookupChannel((string)merged["rules_channel_id"]);
+            updated.PublicUpdatesChannel = updated.LookupChannel((string)merged["public_updates_channel_id"]);
+            return updated;
+        }
+
+        private static DiscordServerMember modelOwner(JObject model, Dictionary<string, DiscordServerMember> members)
+            => (string)model["owner_id"] != null && members.TryGetValue((string)model["owner_id"], out var owner) ? owner : null;
     }
 
     public class DiscordServerMember
     {
         public DiscordUser User { get; internal set; }
         public string Nick { get; internal set; }
-        public DiscordServer Server => string.IsNullOrEmpty(GuildId) ? null : DiscordAPI.Servers[GuildId];
-        public DiscordRole[] Roles => RoleIds?.Select(x => Server.Roles[x]).ToArray();
+        public DiscordServer Server => DiscordAPI.FindServer(GuildId);
+        public DiscordRole[] Roles => Server == null ? new DiscordRole[0] : RoleIds?.Where(x => Server.Roles.ContainsKey(x)).Select(x => Server.Roles[x]).ToArray();
         public DateTime JoinedAt { get; internal set; }
         public DateTime? PremiumSince { get; internal set; }
         public bool Deaf { get; internal set; }
@@ -131,10 +169,10 @@ namespace DiscordUnity.State
         internal DiscordServerMember(GuildMemberModel model)
         {
             GuildId = model.GuildId;
-            User = new DiscordUser(model.User);
+            if (model.User != null) User = new DiscordUser(model.User);
             Nick = model.Nick;
             RoleIds = model.Roles;
-            JoinedAt = model.JoinedAt;
+            JoinedAt = model.JoinedAt.GetValueOrDefault();
             PremiumSince = model.PremiumSince;
             Deaf = model.Deaf;
             Mute = model.Mute;

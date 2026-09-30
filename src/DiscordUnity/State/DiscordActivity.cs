@@ -7,7 +7,7 @@ namespace DiscordUnity.State
         public string Name { get; internal set; }
         public ActivityType Type { get; internal set; }
         public string Url { get; internal set; }
-        public int CreatedAt { get; internal set; }
+        public long CreatedAt { get; internal set; }
         public DiscordActivityTimestamps Timestamps { get; internal set; }
         public string ApplicationId { get; internal set; }
         public string Details { get; internal set; }
@@ -40,8 +40,8 @@ namespace DiscordUnity.State
 
     public class DiscordActivityTimestamps
     {
-        public int Start { get; internal set; }
-        public int End { get; internal set; }
+        public long Start { get; internal set; }
+        public long End { get; internal set; }
 
         internal DiscordActivityTimestamps(ActivityTimestampsModel model)
         {
@@ -74,7 +74,7 @@ namespace DiscordUnity.State
         {
             Id = model.Id;
 
-            if (model.Size.Length == 2)
+            if (model.Size != null && model.Size.Length == 2)
             {
                 Size = model.Size[0];
                 MaxSize = model.Size[1];

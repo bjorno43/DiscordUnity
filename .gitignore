@@ -359,3 +359,16 @@ MigrationBackup/
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
 /DiscordUnity2Tests/config.json
+/src/DiscordUnityTests/config.json
+/validation/UnitySmoke/Library/
+/validation/UnitySmoke/Temp/
+/validation/UnitySmoke/Logs/
+/validation/UnitySmoke/Obj/
+/validation/UnitySmoke/UserSettings/
+/validation/UnitySmoke/Assets/Plugins/
+/validation/UnitySmoke/**/*.meta
+/validation/UnitySmoke/ProjectSettings/*
+!/validation/UnitySmoke/ProjectSettings/ProjectVersion.txt
+/validation/*.log
+/artifacts/
+!/validation/UnitySmoke/Packages/manifest.json

@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <LangVersion>7.3</LangVersion>
+    <AssemblyName>DiscordUnity.ValheimExample</AssemblyName>
+    <ValheimPath Condition="'$(ValheimPath)' == ''">$(VALHEIM_GAME_PATH)</ValheimPath>
+    <ManagedPath Condition="'$(ManagedPath)' == ''">$(ValheimPath)/valheim_Data/Managed</ManagedPath>
+    <BepInExPath Condition="'$(BepInExPath)' == ''">$(ValheimPath)/BepInEx/core</BepInExPath>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/DiscordUnity/DiscordUnity.csproj" />
+    <Reference Include="BepInEx" HintPath="$(BepInExPath)/BepInEx.dll" Private="false" />
+    <Reference Include="UnityEngine" HintPath="$(ManagedPath)/UnityEngine.dll" Private="false" />
+    <Reference Include="UnityEngine.CoreModule" HintPath="$(ManagedPath)/UnityEngine.CoreModule.dll" Private="false" />
+  </ItemGroup>
+  <Target Name="CheckGameReferences" BeforeTargets="ResolveAssemblyReferences">
+    <Error Condition="!Exists('$(BepInExPath)/BepInEx.dll')" Text="Set ValheimPath or BepInExPath to an installation with BepInEx 5." />
+    <Error Condition="!Exists('$(ManagedPath)/UnityEngine.CoreModule.dll')" Text="Set ValheimPath or ManagedPath to the game's managed assemblies." />
+  </Target>
+</Project>

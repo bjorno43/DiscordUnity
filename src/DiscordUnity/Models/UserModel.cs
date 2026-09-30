@@ -4,6 +4,7 @@
     {
         public string Id { get; set; }
         public string Username { get; set; }
+        public string GlobalName { get; set; }
         public string Discriminator { get; set; }
         public string Avatar { get; set; }
         public bool? Bot { get; set; }
@@ -17,6 +18,7 @@
         public UserFlags? PublicFlags { get; set; }
     }
 
+    [System.Flags]
     public enum UserFlags
     {
         None = 0,
@@ -24,14 +26,16 @@
         DiscordPartner = 2,
         HypeSquadEvents = 4,
         BugHunterLevel1 = 8,
-        HouseBravery = 16,
-        HouseBrilliance = 32,
-        HouseBalance = 64,
-        EarlySupporter = 128,
-        TeamUser = 256,
-        System = 512,
-        BugHunterLevel2 = 1024,
-        VerifiedBot = 2048,
-        VerifiedBotDeveloper = 4096
+        HouseBravery = 1 << 6,
+        HouseBrilliance = 1 << 7,
+        HouseBalance = 1 << 8,
+        EarlySupporter = 1 << 9,
+        TeamUser = 1 << 10,
+        System = 1 << 12,
+        BugHunterLevel2 = 1 << 14,
+        VerifiedBot = 1 << 16,
+        VerifiedBotDeveloper = 1 << 17,
+        CertifiedModerator = 1 << 18,
+        BotHttpInteractions = 1 << 19
     }
 }

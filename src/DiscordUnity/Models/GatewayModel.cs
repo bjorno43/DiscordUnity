@@ -12,5 +12,6 @@
         public int Total { get; set; }
         public int Remaining { get; set; }
         public int ResetAfter { get; set; }
+        public int MaxConcurrency { get; set; }
     }
 }

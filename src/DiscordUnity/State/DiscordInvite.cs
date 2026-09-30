@@ -7,8 +7,8 @@ namespace DiscordUnity.State
     {
         public string Code { get; internal set; }
         public DateTime CreatedAt { get; internal set; }
-        public DiscordServer Server => string.IsNullOrEmpty(GuildId) ? null : DiscordAPI.Servers[GuildId];
-        public DiscordChannel Channel => string.IsNullOrEmpty(GuildId) ? DiscordAPI.PrivateChannels[ChannelId] : Server.Channels[ChannelId];
+        public DiscordServer Server => DiscordAPI.FindServer(GuildId);
+        public DiscordChannel Channel => DiscordAPI.FindChannel(GuildId, ChannelId);
         public DiscordUser Inviter { get; internal set; }
         public int MaxAge { get; internal set; }
         public int MaxUses { get; internal set; }
@@ -22,8 +22,8 @@ namespace DiscordUnity.State
 
         internal DiscordInvite(InviteModel model)
         {
-            GuildId = model.GuildId;
-            ChannelId = model.ChannelId;
+            GuildId = model.GuildId ?? model.Guild?.Id;
+            ChannelId = model.ChannelId ?? model.Channel?.Id;
             Code = model.Code;
             CreatedAt = model.CreatedAt;
             if (model.Inviter != null) Inviter = new DiscordUser(model.Inviter);

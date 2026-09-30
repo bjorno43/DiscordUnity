@@ -11,7 +11,7 @@ namespace DiscordUnity.Models
         public string DiscoverySplash { get; set; }
         public bool? Owner { get; set; }
         public string OwnerId { get; set; }
-        public int? Permissions { get; set; }
+        public ulong? Permissions { get; set; }
         public string Region { get; set; }
         public string AfkChannelId { get; set; }
         public int AfkTimeout { get; set; }
@@ -22,7 +22,7 @@ namespace DiscordUnity.Models
         public int ExplicitContentFilter { get; set; }
         public RoleModel[] Roles { get; set; }
         public EmojiModel[] Emojis { get; set; }
-        public GuildFeature[] Features { get; set; }
+        public string[] Features { get; set; }
         public int MfaLevel { get; set; }
         public string ApplicationId { get; set; }
         public bool? WidgetEnabled { get; set; }
@@ -37,6 +37,7 @@ namespace DiscordUnity.Models
         public VoiceStateModel[] VoiceStates { get; set; }
         public GuildMemberModel[] Members { get; set; }
         public ChannelModel[] Channels { get; set; }
+        public ChannelModel[] Threads { get; set; }
         public PresenceModel[] Presences { get; set; }
         public int? MaxPresences { get; set; }
         public int? MaxMembers { get; set; }
@@ -76,8 +77,8 @@ namespace DiscordUnity.Models
         public UserModel User { get; set; }
         public string Nick { get; set; }
         public string[] Roles { get; set; }
-        public DateTime JoinedAt { get; set; }
-        public DateTime PremiumSince { get; set; }
+        public DateTime? JoinedAt { get; set; }
+        public DateTime? PremiumSince { get; set; }
         public bool Deaf { get; set; }
         public bool Mute { get; set; }
     }

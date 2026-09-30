@@ -6,8 +6,8 @@ namespace DiscordUnity.State
     public class DiscordMessage
     {
         public string Id { get; internal set; }
-        public DiscordServer Server => string.IsNullOrEmpty(GuildId) ? null : DiscordAPI.Servers[GuildId];
-        public DiscordChannel Channel => string.IsNullOrEmpty(GuildId) ? DiscordAPI.PrivateChannels[ChannelId] : Server.Channels[ChannelId];
+        public DiscordServer Server => DiscordAPI.FindServer(GuildId);
+        public DiscordChannel Channel => DiscordAPI.FindChannel(GuildId, ChannelId);
         public DiscordUser Author { get; internal set; }
         public string Content { get; internal set; }
         public DateTime Timestamp { get; internal set; }
@@ -16,8 +16,8 @@ namespace DiscordUnity.State
         public bool MentionEveryone { get; internal set; }
         public MessageType Type { get; internal set; }
 
-        private readonly string GuildId;
-        private readonly string ChannelId;
+        public string GuildId { get; }
+        public string ChannelId { get; }
 
         internal DiscordMessage(MessageModel model)
         {
@@ -36,6 +36,7 @@ namespace DiscordUnity.State
 
     public class DiscordReaction
     {
+        public string UserId { get; internal set; }
         public int Count { get; internal set; }
         public bool Me { get; internal set; }
         public DiscordEmoji Emoji { get; internal set; }

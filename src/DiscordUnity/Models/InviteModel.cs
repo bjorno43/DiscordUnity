@@ -8,6 +8,8 @@ namespace DiscordUnity.Models
         public string Code { get; set; }
         public DateTime CreatedAt { get; set; }
         public string GuildId { get; set; }
+        public GuildModel Guild { get; set; }
+        public ChannelModel Channel { get; set; }
         public UserModel Inviter { get; set; }
         public int MaxAge { get; set; }
         public int MaxUses { get; set; }

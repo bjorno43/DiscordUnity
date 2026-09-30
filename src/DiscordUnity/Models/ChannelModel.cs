@@ -32,7 +32,14 @@ namespace DiscordUnity.Models
         GROUP_DM = 3,       // A direct message between multiple users
         GUILD_CATEGORY = 4, // An organizational category that contains up to 50 channels
         GUILD_NEWS = 5,     // A channel that users can follow and crosspost into their own server
-        GUILD_STORE = 6     // A channel in which game developers can sell their game on Discord
+        GUILD_STORE = 6,    // Legacy type, no longer created
+        GUILD_NEWS_THREAD = 10,
+        GUILD_PUBLIC_THREAD = 11,
+        GUILD_PRIVATE_THREAD = 12,
+        GUILD_STAGE_VOICE = 13,
+        GUILD_DIRECTORY = 14,
+        GUILD_FORUM = 15,
+        GUILD_MEDIA = 16
     }
 
     internal class ChannelPinsModel

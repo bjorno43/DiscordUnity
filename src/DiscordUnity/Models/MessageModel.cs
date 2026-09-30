@@ -15,7 +15,7 @@ namespace DiscordUnity.Models
         public bool Tts { get; set; }
         public bool MentionEveryone { get; set; }
         public UserModel[] Mentions { get; set; }
-        public RoleModel[] MentionRoles { get; set; }
+        public string[] MentionRoles { get; set; }
         public ChannelMentionModel[] MentionChannels { get; set; }
         public AttachmentModel[] Attachments { get; set; }
         public EmbedModel[] Embeds { get; set; }
@@ -160,7 +160,14 @@ namespace DiscordUnity.Models
         USER_PREMIUM_GUILD_SUBSCRIPTION_TIER_3 = 11,
         CHANNEL_FOLLOW_ADD = 12,
         GUILD_DISCOVERY_DISQUALIFIED = 14,
-        GUILD_DISCOVERY_REQUALIFIED = 15
+        GUILD_DISCOVERY_REQUALIFIED = 15,
+        THREAD_CREATED = 18,
+        REPLY = 19,
+        CHAT_INPUT_COMMAND = 20,
+        THREAD_STARTER_MESSAGE = 21,
+        CONTEXT_MENU_COMMAND = 23,
+        AUTO_MODERATION_ACTION = 24,
+        POLL_RESULT = 46
     }
 
     internal class MessageActivityModel

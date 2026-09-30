@@ -3,8 +3,8 @@
     internal class OverwriteModel
     {
         public string Id { get; set; }
-        public string Type { get; set; }
-        public int Allow { get; set; }
-        public int Deny { get; set; }
+        public int Type { get; set; }
+        public ulong Allow { get; set; }
+        public ulong Deny { get; set; }
     }
 }

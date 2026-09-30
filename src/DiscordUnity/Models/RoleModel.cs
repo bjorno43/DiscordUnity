@@ -7,7 +7,7 @@
         public int Color { get; set; }
         public bool Hoist { get; set; }
         public int Position { get; set; }
-        public int Permissions { get; set; }
+        public ulong Permissions { get; set; }
         public bool Managed { get; set; }
         public bool Mentionable { get; set; }
     }
