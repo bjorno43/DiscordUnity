@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <LangVersion>7.3</LangVersion>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <AssemblyName>ValheimDiscordChat</AssemblyName>
+    <Version>0.1.0</Version>
+    <Deterministic>true</Deterministic>
+    <ValheimPath Condition="'$(ValheimPath)' == ''">$(VALHEIM_GAME_PATH)</ValheimPath>
+    <ManagedPath Condition="'$(ManagedPath)' == '' and Exists('$(ValheimPath)/valheim_server_Data/Managed/assembly_valheim.dll')">$(ValheimPath)/valheim_server_Data/Managed</ManagedPath>
+    <ManagedPath Condition="'$(ManagedPath)' == ''">$(ValheimPath)/valheim_Data/Managed</ManagedPath>
+    <BepInExPath Condition="'$(BepInExPath)' == ''">$(ValheimPath)/BepInEx/core</BepInExPath>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Remove="Tests/**/*.cs" />
+    <Compile Remove="NativeTests/**/*.cs" />
+    <Compile Remove="MonoSmoke/**/*.cs" />
+    <ProjectReference Include="../../src/DiscordUnity/DiscordUnity.csproj" />
+    <Reference Include="BepInEx" HintPath="$(BepInExPath)/BepInEx.dll" Private="false" />
+    <Reference Include="0Harmony" HintPath="$(BepInExPath)/0Harmony.dll" Private="false" />
+    <Reference Include="assembly_valheim" HintPath="$(ManagedPath)/assembly_valheim.dll" Private="false" />
+    <Reference Include="assembly_utils" HintPath="$(ManagedPath)/assembly_utils.dll" Private="false" />
+    <Reference Include="assembly_guiutils" HintPath="$(ManagedPath)/assembly_guiutils.dll" Private="false" />
+    <Reference Include="Splatform" HintPath="$(ManagedPath)/Splatform.dll" Private="false" />
+    <Reference Include="UnityEngine" HintPath="$(ManagedPath)/UnityEngine.dll" Private="false" />
+    <Reference Include="UnityEngine.CoreModule" HintPath="$(ManagedPath)/UnityEngine.CoreModule.dll" Private="false" />
+  </ItemGroup>
+  <Target Name="CheckGameReferences" BeforeTargets="ResolveAssemblyReferences">
+    <ItemGroup>
+      <Reference Remove="@(Reference)" Condition="'%(Reference.Filename)' == 'System.Net.Http' or '%(Reference.Filename)' == 'System.IO.Compression'" />
+    </ItemGroup>
+    <Error Condition="!Exists('$(ManagedPath)/assembly_valheim.dll')" Text="Set ValheimPath or ManagedPath to the Valheim managed assemblies. Dedicated servers can use valheim_server_Data/Managed." />
+    <Error Condition="!Exists('$(BepInExPath)/0Harmony.dll')" Text="Set ValheimPath or BepInExPath to a BepInEx 5 installation." />
+  </Target>
+</Project>

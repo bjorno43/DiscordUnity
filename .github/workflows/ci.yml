@@ -27,6 +27,8 @@ jobs:
         run: dotnet src/DiscordUnityTests/bin/Release/net8.0/DiscordUnityTests.dll
       - name: Run offline tests on .NET Framework
         run: ./src/DiscordUnityTests/bin/Release/net472/DiscordUnityTests.exe
+      - name: Test Valheim chat policy without game dependencies
+        run: dotnet run --project Examples/ValheimChatBridge/Tests/ChatPolicyTests.csproj -c Release
       - name: Package runtime and source
         run: python scripts/package.py
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7

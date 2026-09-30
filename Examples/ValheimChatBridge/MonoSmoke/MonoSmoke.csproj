@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <LangVersion>7.3</LangVersion>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <AssemblyName>ValheimDiscordChatMonoProbe</AssemblyName>
+    <ValheimPath Condition="'$(ValheimPath)' == ''">$(VALHEIM_GAME_PATH)</ValheimPath>
+    <ManagedPath Condition="'$(ManagedPath)' == ''">$(ValheimPath)/valheim_server_Data/Managed</ManagedPath>
+    <BepInExPath Condition="'$(BepInExPath)' == ''">$(ValheimPath)/BepInEx/core</BepInExPath>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../ValheimDiscordChat.csproj" />
+    <Reference Include="BepInEx" HintPath="$(BepInExPath)/BepInEx.dll" Private="false" />
+    <Reference Include="0Harmony" HintPath="$(BepInExPath)/0Harmony.dll" Private="false" />
+    <Reference Include="assembly_valheim" HintPath="$(ManagedPath)/assembly_valheim.dll" Private="false" />
+    <Reference Include="assembly_utils" HintPath="$(ManagedPath)/assembly_utils.dll" Private="false" />
+    <Reference Include="assembly_guiutils" HintPath="$(ManagedPath)/assembly_guiutils.dll" Private="false" />
+    <Reference Include="Splatform" HintPath="$(ManagedPath)/Splatform.dll" Private="false" />
+    <Reference Include="UnityEngine" HintPath="$(ManagedPath)/UnityEngine.dll" Private="false" />
+    <Reference Include="UnityEngine.CoreModule" HintPath="$(ManagedPath)/UnityEngine.CoreModule.dll" Private="false" />
+  </ItemGroup>
+  <Target Name="GameReferences" BeforeTargets="ResolveAssemblyReferences">
+    <ItemGroup><Reference Remove="@(Reference)" Condition="'%(Reference.Filename)' == 'System.Net.Http' or '%(Reference.Filename)' == 'System.IO.Compression'" /></ItemGroup>
+  </Target>
+</Project>

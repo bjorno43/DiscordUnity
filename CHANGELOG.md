@@ -1,5 +1,12 @@
 # Changelog
 
+## Valheim Discord Chat example 0.1.0 — 2026-09-30
+
+- Add a dedicated-server BepInEx 5 chat bridge with unsafe compilation enabled.
+- Relay only Valheim shouts to one Discord channel and human Discord text messages to all connected players.
+- Include private local token/channel configuration, bounded queues, loop prevention, nickname fallback, native packet and chat policy tests, and an installation ZIP builder.
+- Document the accepted vanilla player-name prefix for incoming Discord messages. A separate administrator channel is deferred until after the initial live tests.
+
 ## 2.0.0 — 2026-09-30
 
 This version belongs to the bjorno43/DiscordUnity fork.

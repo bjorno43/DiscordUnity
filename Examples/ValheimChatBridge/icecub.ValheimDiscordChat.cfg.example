@@ -1,0 +1,15 @@
+## Valheim Discord Chat 0.1.0 - dedicated server only
+## Copy to BepInEx/config/icecub.ValheimDiscordChat.cfg, or let the plugin generate it.
+## Restart the server after editing this file. Keep the token private.
+
+[General]
+Enabled = true
+
+[Discord]
+BotToken =
+ChannelId =
+
+[Chat]
+GameToDiscord = true
+DiscordToGame = true
+MaxMessageLength = 500

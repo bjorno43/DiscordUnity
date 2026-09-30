@@ -372,3 +372,4 @@ FodyWeavers.xsd
 /validation/*.log
 /artifacts/
 !/validation/UnitySmoke/Packages/manifest.json
+/Examples/ValheimChatBridge/*.cfg

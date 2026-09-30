@@ -123,6 +123,8 @@ Use a `JObject` containing `JValue.CreateNull()` to explicitly clear a field; or
 
 [Examples/ValheimBot](Examples/ValheimBot/README.md) contains a minimal BepInEx 5 plugin, disabled by default. The example targets .NET Standard 2.1 to match the current Valheim assemblies; the DiscordUnity library remains .NET Standard 2.0.
 
+[Valheim Discord Chat](Examples/ValheimChatBridge/README.md) is a dedicated-server example bridging Valheim shouts (`/s`) and one Discord text channel. It requires no client mod and includes configuration, offline/native packet tests, and an installation package builder. See its README for the accepted vanilla player-name prefix on incoming Discord messages.
+
 ```powershell
 dotnet restore src/DiscordUnity.sln --configfile NuGet.Config
 dotnet build src/DiscordUnity.sln -c Release --no-restore

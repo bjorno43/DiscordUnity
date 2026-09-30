@@ -9,7 +9,9 @@ artifacts = repo / "artifacts"
 artifacts.mkdir(exist_ok=True)
 version = "2.0.0"
 docs = ["README.md", "AUDIT.md", "CHANGELOG.md", "LICENSE", "THIRD-PARTY-NOTICES.md",
-        "validation/README.md", "validation/RESULTS.md", "Examples/ValheimBot/README.md"]
+        "validation/README.md", "validation/RESULTS.md", "Examples/ValheimBot/README.md",
+        "Examples/ValheimChatBridge/README.md", "Examples/ValheimChatBridge/TESTING.md",
+        "Examples/ValheimChatBridge/MonoSmoke/README.md"]
 runtime = {
     "lib/netstandard2.0/DiscordUnity.dll": repo / "src/DiscordUnity/bin/Release/netstandard2.0/DiscordUnity.dll",
     "lib/netstandard2.0/Newtonsoft.Json.dll": repo / "src/DiscordUnity/bin/Release/netstandard2.0/Newtonsoft.Json.dll",
@@ -30,9 +32,10 @@ with zipfile.ZipFile(artifacts / f"DiscordUnity-{version}-UnityMono.zip", "w", z
     archive.writestr("BUILD-MANIFEST.json", json.dumps(manifest, indent=2) + "\n")
 
 sources = set(docs + [".gitignore", ".github/workflows/ci.yml", "NuGet.Config", "src/DiscordUnity.sln", "scripts/package.py",
+                     "scripts/package-valheim-chat.py", "Examples/ValheimChatBridge/icecub.ValheimDiscordChat.cfg.example",
                      "validation/Run-UnitySmoke.ps1", "validation/UnitySmoke/Assets/Editor/DiscordUnitySmoke.cs",
                      "validation/UnitySmoke/ProjectSettings/ProjectVersion.txt", "validation/UnitySmoke/Packages/manifest.json"])
-for folder in ["src/DiscordUnity", "src/DiscordUnityTests", "Examples/ValheimBot"]:
+for folder in ["src/DiscordUnity", "src/DiscordUnityTests", "Examples/ValheimBot", "Examples/ValheimChatBridge"]:
     for path in (repo / folder).rglob("*"):
         if path.is_file() and path.suffix in {".cs", ".csproj"} and not {"bin", "obj"}.intersection(path.relative_to(repo).parts):
             sources.add(path.relative_to(repo).as_posix())

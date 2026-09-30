@@ -2,6 +2,7 @@
   <PropertyGroup>
     <TargetFramework>netstandard2.1</TargetFramework>
     <LangVersion>7.3</LangVersion>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <AssemblyName>DiscordUnity.ValheimExample</AssemblyName>
     <ValheimPath Condition="'$(ValheimPath)' == ''">$(VALHEIM_GAME_PATH)</ValheimPath>
     <ManagedPath Condition="'$(ManagedPath)' == ''">$(ValheimPath)/valheim_Data/Managed</ManagedPath>
