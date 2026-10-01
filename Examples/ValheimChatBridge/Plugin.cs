@@ -14,7 +14,7 @@ using UnityEngine;
 
 namespace ValheimDiscordChat
 {
-    [BepInPlugin(Guid, "Valheim Discord Chat", "0.2.1")]
+    [BepInPlugin(Guid, "Valheim Discord Chat", "0.2.2")]
     public sealed partial class Plugin : BaseUnityPlugin
     {
         public const string Guid = "icecub.ValheimDiscordChat";
@@ -26,7 +26,7 @@ namespace ValheimDiscordChat
         private readonly ChatCoalescer coalescer = new ChatCoalescer();
         private readonly RecentIds gameIds = new RecentIds();
         private readonly RecentIds discordIds = new RecentIds();
-        private ConfigEntry<bool> modEnabled, toDiscord, toGame;
+        private ConfigEntry<bool> modEnabled, toDiscord, toGame, soloChatRelay;
         private ConfigEntry<string> token, channel, adminChannel, commandsChannel, allowedRoleIds;
         private ConfigEntry<int> maxLength;
         private Harmony harmony;
@@ -62,6 +62,7 @@ namespace ValheimDiscordChat
             allowedRoleIds = Config.Bind("Commands", "AllowedRoleIds", "", "Comma-separated Discord role IDs allowed to kick, ban, alert and setatspawn. Empty denies all moderation actions.");
             toDiscord = Config.Bind("Chat", "GameToDiscord", true, "Forward only shouts (/s) to Discord. Normal chat, whispers and pings are excluded.");
             toGame = Config.Bind("Chat", "DiscordToGame", true, "Forward human text messages from the configured channel to all connected players.");
+            soloChatRelay = Config.Bind("Chat", "SoloChatRelay", true, "Experimental: add DiscordBot to the solo client's roster so vanilla chat reaches the server. Client player count and one-per-player drops increase by one; server statistics stay unchanged. Restart after changing settings.");
             maxLength = Config.Bind("Chat", "MaxMessageLength", 500, new ConfigDescription("Maximum relayed message length, excluding name/prefix.", new AcceptableValueRange<int>(32, 1500)));
             harmony = new Harmony(Guid);
             harmony.PatchAll(typeof(Plugin).Assembly);

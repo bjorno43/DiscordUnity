@@ -25,6 +25,47 @@ public static class ChatBridgeProbe
     }
     private static void Set(Type type, object target, string name, object value) => AccessTools.Field(type, name).SetValue(target, value);
     private static object Call(object target, string method, params object[] args) => AccessTools.Method(target.GetType(), method).Invoke(target, args);
+    // Only platform identity and the text privilege are supplied. A profile lookup fails the
+    // test, proving that the native self-account permission path needs no fabricated profile.
+    private sealed class MemoryPlatform : IDistributionPlatform, ILocalUser, IPrivilegeProvider, IRelationsProvider
+    {
+        internal PlatformUserID Identity;
+        internal PrivilegeResult TextPrivilege = PrivilegeResult.Granted;
+        public Platform Platform => new Platform("Steam");
+        public ILocalUser LocalUser => this;
+        public IUIProvider UIProvider => null;
+        public IPrivilegeProvider PrivilegeProvider => this;
+        public IRelationsProvider RelationsProvider => this;
+        public IHardwareInfoProvider HardwareInfoProvider => null;
+        public IPerformanceCharacteristicsProvider PerformanceCharacteristicsProvider => null;
+        public IPLMProvider PLMProvider => null;
+        public ISaveDataProvider SaveDataProvider => null;
+        public IAchievementManager AchievementManager => null;
+        public IMatchmakingProvider MatchmakingProvider => null;
+        public IAuthenticationProvider AuthenticationProvider => null;
+        public IInputDeviceManager InputDeviceManager => null;
+        public IPreferencesProvider PreferencesProvider => null;
+        public IActivityProvider ActivityProvider => null;
+        public string DisplayName => "Memory player";
+        public string Locale => "en-US";
+        public PlatformUserID PlatformUserID => Identity;
+        public bool IsSignedIn => true;
+        public event SignedInHandler SignedIn { add { } remove { } }
+        public event PlatformSignOutHandler PlatformSignOut { add { } remove { } }
+        public event RelationsChangedHandler RelationsChanged { add { } remove { } }
+        public PrivilegeResult CheckPrivilege(Privilege privilege) => TextPrivilege;
+        public void SetMultiplayerUsage(MultiplayerUsage usage) { }
+        public void SetCrossplayPrivilege(PrivilegeResult privilege) { }
+        public void Update() { }
+        public void InitializeAsync(PlatformConfiguration configuration, AsyncOperationCompletedHandler completed) => completed(true);
+        public void Dispose() { }
+        public void GetUserProfileAsync(PlatformUserID user, GetUserProfileCompletedHandler completed, GetUserProfileFailedHandler failed)
+            => throw new Exception("Unexpected external profile lookup for a solo recipient");
+        public bool TryGetUserProfile(PlatformUserID user, out IUserProfile profile) { profile = null; return false; }
+        public bool IsFriend(PlatformUserID user) => false;
+        public bool IsBlocked(PlatformUserID user) => false;
+        public PlatformUserID[] GetFriends() => new PlatformUserID[0];
+    }
     private sealed class MemorySocket : ISocket
     {
         internal readonly List<byte[]> Sent = new List<byte[]>();
@@ -135,6 +176,9 @@ public static class ChatBridgeProbe
                 network.GetPeers().Add(peer); router.AddPeer(peer);
                 var p = default(ZNet.PlayerInfo); p.m_name = peer.m_playerName; p.m_characterID = peer.m_characterID;
                 p.m_userInfo.m_id = new PlatformUserID("Steam_765611980000000" + peer.m_uid);
+                p.m_userInfo.m_displayName = peer.m_playerName;
+                p.m_userInfo.m_serverAssignedDisplayName = peer.m_playerName;
+                p.m_userInfo.m_playfabId = "memory-playfab-" + peer.m_uid;
                 network.GetPlayerList().Add(p);
             }
             var plugin = go.AddComponent<Plugin>();
@@ -313,6 +357,113 @@ public static class ChatBridgeProbe
             Call(router, "RPC_RoutedRPC", a.m_rpc, forwarded);
             Check(outgoing.Count == beforeChat + 1 && outgoing.Last() == "[Valheim] Viking One: Multiplayer routing proof",
                 "Vanilla chat addressed to a second player crosses the server and reaches the Discord relay");
+            // Exercise the production outgoing roster hook and the native client parser and
+            // permission loop, rather than inventing a second recipient inside the test.
+            var realRoster = network.GetPlayerList();
+            Check(new ZPackage(((ZPackage)Call(network, "WritePlayerInfo", realRoster)).GetArray()).ReadInt() == 3,
+                "Experimental roster leaves a multiplayer packet unchanged");
+            var soloPlayer = realRoster[0];
+            soloPlayer.m_publicPosition = true; soloPlayer.m_position = new Vector3(12, 34, 56);
+            network.GetPeers().Remove(b); network.GetPeers().Remove(c);
+            realRoster.Clear(); realRoster.Add(soloPlayer);
+            var soloPacket = (ZPackage)Call(network, "WritePlayerInfo", realRoster);
+            Check(new ZPackage(soloPacket.GetArray()).ReadInt() == 2 && network.GetNrOfPlayers() == 1 && network.GetPeers().Count == 1,
+                "Production roster hook adds one outgoing row without adding a real server player or peer");
+            var soloSetting = (BepInEx.Configuration.ConfigEntry<bool>)Field(plugin, "soloChatRelay");
+            soloSetting.Value = false;
+            Check(new ZPackage(((ZPackage)Call(network, "WritePlayerInfo", realRoster)).GetArray()).ReadInt() == 1,
+                "SoloChatRelay=false restores the native solo packet");
+            soloSetting.Value = true;
+            Set(typeof(Plugin), plugin, "ready", false);
+            Check(new ZPackage(((ZPackage)Call(network, "WritePlayerInfo", realRoster)).GetArray()).ReadInt() == 1,
+                "Disconnected Discord does not advertise a chat recipient");
+            Set(typeof(Plugin), plugin, "ready", true);
+            a.m_characterID = ZDOID.None;
+            Check(new ZPackage(((ZPackage)Call(network, "WritePlayerInfo", realRoster)).GetArray()).ReadInt() == 1,
+                "Loading players without a character do not receive the experimental row");
+            a.m_characterID = soloPlayer.m_characterID;
+            network.GetPeers().Add(b); // Another ready connection counts even before its row updates.
+            Check(new ZPackage(((ZPackage)Call(network, "WritePlayerInfo", realRoster)).GetArray()).ReadInt() == 1,
+                "A second ready connection removes DiscordBot before its roster row arrives");
+            network.GetPeers().Remove(b);
+            var clientObject = new GameObject("isolated solo client"); clientObject.SetActive(false);
+            var clientNetwork = clientObject.AddComponent<ZNet>();
+            var platformManager = clientObject.AddComponent<PlatformManager>();
+            var platform = new MemoryPlatform { Identity = soloPlayer.m_userInfo.m_id };
+            Set(typeof(PlatformManager), null, "s_instance", platformManager);
+            Set(typeof(PlatformManager), platformManager, "m_distributionPlatform", platform);
+            Set(typeof(ZNet), clientNetwork, "m_characterID", a.m_characterID);
+            Set(typeof(ZNet), clientNetwork, "m_world", new World());
+            Set(typeof(ZNet), null, "m_instance", clientNetwork); Set(typeof(ZNet), null, "m_isServer", false);
+            Call(clientNetwork, "RPC_PlayerList", a.m_rpc, new ZPackage(soloPacket.GetArray()));
+            var decoded = clientNetwork.GetPlayerList();
+            var phantom = decoded[1];
+            Check(decoded.Count == 2 && decoded[0].m_name == a.m_playerName && phantom.m_name == "DiscordBot" &&
+                decoded[0].m_publicPosition && decoded[0].m_position == soloPlayer.m_position &&
+                !phantom.m_characterID.IsNone() && phantom.m_characterID != a.m_characterID && !phantom.m_publicPosition,
+                "Native client parser receives DiscordBot after the real player with no public map position");
+            Check(phantom.m_userInfo == decoded[0].m_userInfo && phantom.m_characterID.UserID != a.m_uid,
+                "DiscordBot copies the complete local account while using a different network recipient");
+            ZNet.PlayerInfo found;
+            Check(ZNet.TryGetPlayerByPlatformUserID(platform.Identity, out found) && found.m_name == a.m_playerName,
+                "Native and BetterChat name lookup still resolves the real player first");
+            Call(clientNetwork, "UpdatePlayerHistory");
+            Check(clientNetwork.GetWorld().m_playerHistory.Count == 1 &&
+                ((List<PlatformUserID>)Field(clientNetwork, "m_recentPlayers")).All(recentId => recentId == platform.Identity),
+                "Native history deduplicates the copied account and introduces no extra recent-player identity");
+            Check(clientNetwork.GetNrOfPlayers() == 2, "Client count includes the accepted synthetic row");
+            Set(typeof(ZRoutedRpc), null, "s_instance", clientRouter);
+            clientSocket.Sent.Clear();
+            var recipients = new List<long>();
+            Chat.CheckPermissionsAndSendChatMessageRPCsAsync((user, filter) =>
+            {
+                recipients.Add(user);
+                Check(!filter, "Native solo recipient self-account permission preserves unfiltered text");
+                clientRouter.InvokeRoutedRPC(user, "ChatMessage", Vector3.zero, (int)Talker.Type.Shout, clientUser, "Experimental solo shout");
+            });
+            Check(recipients.SequenceEqual(new[] { a.m_uid, phantom.m_characterID.UserID }) && clientSocket.Sent.Count == 1,
+                "Native chat permission loop sends exactly one solo shout to the real server without a platform profile lookup");
+            platform.TextPrivilege = PrivilegeResult.DeniedUnknown;
+            Chat.CheckPermissionsAndSendChatMessageRPCsAsync((user, filter) => { throw new Exception("Text privilege denial was bypassed"); });
+            Check(clientSocket.Sent.Count == 1, "Experimental roster preserves native text privilege denial");
+            platform.TextPrivilege = PrivilegeResult.Granted;
+            foreach (var type in new[] { Talker.Type.Normal, Talker.Type.Whisper })
+                Chat.CheckPermissionsAndSendChatMessageRPCsAsync((user, filter) =>
+                {
+                    if (user != a.m_uid) clientRouter.InvokeRoutedRPC(user, a.m_characterID, "Say", (int)type, clientUser, "Experimental solo " + type);
+                });
+            Set(typeof(ZNet), null, "m_instance", network); Set(typeof(ZNet), null, "m_isServer", true);
+            Set(typeof(ZRoutedRpc), null, "s_instance", router);
+            int publicBefore = outgoing.Count, adminBefore = admin.Count;
+            foreach (var bytes in clientSocket.Sent)
+            {
+                var envelope = new ZPackage(bytes); envelope.ReadInt();
+                Call(router, "RPC_RoutedRPC", a.m_rpc, envelope.ReadPackage());
+            }
+            Check(outgoing.Count == publicBefore + 1 && outgoing.Last() == "[Valheim] Viking One: Experimental solo shout" &&
+                admin.Count == adminBefore + 3 && admin.Last().Contains("Experimental solo Whisper"),
+                "Experimental solo packets reach production Discord queues: public shout only, all three types in admin");
+            Call(stats, "Tick", network);
+            Check(network.GetNrOfPlayers() == 1 && ((System.Collections.IDictionary)Field(stats, "Sessions")).Count == 1 &&
+                !JObject.Parse(File.ReadAllText(statsFile))["Players"].ToString().Contains("DiscordBot"),
+                "Server statistics and persistent accounts contain only real players");
+            PumpCommand(plugin, Interaction("311", "stats")); PumpCommand(plugin, Interaction("312", "online"));
+            var soloStatsReply = http.Bodies.Select(JObject.Parse).Last(s => (string)s["embeds"]?.First?["title"] == "Valheim Server Stats");
+            var soloOnlineReply = http.Bodies.Select(JObject.Parse).Last(s => (string)s["embeds"]?.First?["title"] == "Online Players");
+            Check(soloStatsReply["embeds"][0]["fields"].Any(f => (string)f["name"] == "Players online" && (string)f["value"] == "1") &&
+                ((JArray)soloOnlineReply["embeds"][0]["fields"]).Count == 1 && !soloOnlineReply.ToString().Contains("DiscordBot"),
+                "Actual stats and online command embeds exclude DiscordBot");
+            network.GetPeers().Clear(); realRoster.Clear();
+            Check(new ZPackage(((ZPackage)Call(network, "WritePlayerInfo", realRoster)).GetArray()).ReadInt() == 0,
+                "An empty server advertises no DiscordBot");
+            network.GetPeers().Add(a); realRoster.Add(soloPlayer);
+            Check(new ZPackage(((ZPackage)Call(network, "WritePlayerInfo", realRoster)).GetArray()).ReadInt() == 2,
+                "A returning solo player receives DiscordBot again");
+            network.GetPeers().Add(b);
+            var secondPlayer = soloPlayer; secondPlayer.m_name = b.m_playerName; secondPlayer.m_characterID = b.m_characterID;
+            secondPlayer.m_userInfo.m_id = new PlatformUserID("Steam_76561198000000022"); realRoster.Add(secondPlayer);
+            Check(new ZPackage(((ZPackage)Call(network, "WritePlayerInfo", realRoster)).GetArray()).ReadInt() == 2 &&
+                realRoster.All(p => p.m_name != "DiscordBot"), "Two real players replace the synthetic recipient on the next native roster update");
             Call(plugin, "StopBridge");
             Check(outgoing.Count == 0 && incoming.Count == 0, "Shutdown clears pending relay messages");
         }

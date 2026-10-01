@@ -1,4 +1,4 @@
-## Valheim Discord Chat 0.2.1 - dedicated server only
+## Valheim Discord Chat 0.2.2 - dedicated server only; experimental solo chat
 ## Copy to BepInEx/config/icecub.ValheimDiscordChat.cfg, or let the plugin generate it.
 ## Restart the server after editing this file. Keep the token private.
 
@@ -14,6 +14,9 @@ CommandsChannelId =
 [Chat]
 GameToDiscord = true
 DiscordToGame = true
+## Adds DiscordBot only to a solo client's roster. Client count and one-per-player drops increase.
+## Server statistics stay real. Set false and restart to disable the trial.
+SoloChatRelay = true
 MaxMessageLength = 500
 
 [Commands]

@@ -23,7 +23,8 @@ for name, path in files.items():
     if not path.is_file():
         raise SystemExit("Build the chat plugin in Release first: " + str(path))
 manifest = {
-    "version": "0.2.1",
+    "version": "0.2.2",
+    "experimentalSoloChat": True,
     "pluginGuid": "icecub.ValheimDiscordChat",
     "targetFramework": "netstandard2.1",
     "discordUnityTargetFramework": "netstandard2.0",
@@ -33,7 +34,7 @@ manifest = {
 }
 artifacts = repo / "artifacts"
 artifacts.mkdir(exist_ok=True)
-output = artifacts / "ValheimDiscordChat-0.2.1.zip"
+output = artifacts / "ValheimDiscordChat-0.2.2.zip"
 with zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED) as archive:
     for name, path in files.items():
         archive.write(path, name)

@@ -6,9 +6,11 @@ Validated on October 1, 2026:
 |---|---|
 | Release build against Valheim client 1.0.16 | Passed, 0 warnings / 0 errors |
 | Release build against dedicated server 1.0.12 | Passed, 0 warnings / 0 errors |
+| Release build against dedicated server 1.0.16 | Passed, 0 warnings / 0 errors |
 | Chat/command policy suite on .NET 8 | Passed, 52 assertions |
 | Native packet suite using installed client assemblies on .NET 8 | Passed, 13 assertions |
-| Isolated Unity Player / Mono, dedicated server 1.0.12 assemblies and production plugin | Passed, 54 integration checks |
+| Isolated Unity Player / Mono, dedicated server 1.0.12 assemblies and production plugin | Passed, 75 integration checks |
+| Isolated Unity Player / Mono, dedicated server 1.0.16 assemblies and production plugin | Passed, 75 integration checks |
 | DiscordUnity regression suite on .NET 8 and .NET Framework 4.7.2 | Passed, 19 scenarios / 928 assertions per host |
 
 The native suite uses the game's `ZRpc.Serialize`, `UserInfo` and `ZRoutedRpc.RoutedRPCData` serialization. It checks chat decoding, unmodified vanilla bytes/read position, authenticated sender/player-object validation, ping exclusion, and malformed/oversized packets.
@@ -21,13 +23,17 @@ The [Unity/Mono integration probe](MonoSmoke/README.md) loads the production Har
 - Unchanged vanilla routing, recipient coalescing, intentional repeats, client guards, sender spoofing and incoming-message deduplication.
 - Per-recipient vanilla Discord chat packets and unchanged player rosters.
 - Native client routing reproduces local-only chat with no server packet, then verifies that a second-recipient chat packet traverses the server and reaches the production Discord relay.
+- Production `WritePlayerInfo` Harmony hook adds DiscordBot only to the outgoing solo packet. Native `RPC_PlayerList` reads both rows and preserves the real public position and complete account metadata.
+- Native `Chat.CheckPermissionsAndSendChatMessageRPCsAsync` and `RelationsManager.CheckPermissionAsync` run with a memory platform providing the local account and text privilege. The actual self-account permission path sends the synthetic recipient's shout without an external profile lookup; text privilege denial still stops sending. Native routed `Say` packets for normal/whisper are sent using the same recipient loop, with local presentation omitted from the fixture.
+- Captured solo packets reach the existing public/admin queues with the correct chat-type filtering. Native name lookup resolves the real row first; history deduplicates the copied account. Server rosters, persisted accounts and `/stats`/`/online` embeds exclude DiscordBot.
+- Zero/one/two real-player transitions, returning solo players, a second ready connection before its roster row appears, unspawned characters, bridge inactivity and configuration disablement use the expected native or extended packet.
 - Persisted death counting, duplicate/spoof rejection, restart reload, and importing offline world-history accounts without double-counting Steam players.
 - Wrong-role/wrong-channel denials, ephemeral responses, waiting for successful acknowledgement, failed acknowledgements, disconnects, duplicate commands, ambiguous names and non-Steam moderation refusal.
 - Actual native `Kicked` RPC and Valheim `SyncedList` persistence of the resolved Steam ID in an isolated ban file.
 - Native global center-screen announcement RPC and one-recipient distant-teleport RPC with vanilla spawn offset.
 - Stats/online embed fields and cleared plaintext content, suppressed mentions, six guild command upserts preserving unrelated commands, and shutdown cleanup.
 
-The teleport fixture supplies a deterministic world-spawn lookup result; it validates the production lookup name and RPC payload, not arrival in a fully generated world. Discord readiness and role payloads are simulated. These checks do not prove real command visibility, actual Discord bot permissions, client HUD rendering, teleport arrival, or gameplay reconnect refusal after a ban.
+The native client-routing objects and permission loop run inside the isolated dedicated-assembly host, not a fully connected game client. Steam/PlayFab authentication and platform identity are simulated. The teleport fixture supplies a deterministic world-spawn lookup result; it validates the production lookup name and RPC payload, not arrival in a fully generated world. Discord readiness and role payloads are simulated. These checks do not prove live solo Steam/crossplay chat, actual F2 rendering, real command visibility, Discord bot permissions, client HUD rendering, teleport arrival, or gameplay reconnect refusal after a ban. One-per-player loot scaling is intentionally unchanged and accepted for this trial.
 
 The owner confirmed the previous 0.1.0 bidirectional bridge working in a real authenticated gameplay session. The 0.2.x features still require the live acceptance checks in [README.md](README.md). No real token was used or included in the probe/package.
 

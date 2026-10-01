@@ -1,5 +1,13 @@
 # Changelog
 
+## Valheim Discord Chat example 0.2.2 — 2026-10-01 (experimental)
+
+- Enable configurable solo chat using an outgoing-only DiscordBot player-list row, with no client plugin or actual player connection.
+- Reuse the solo player's account metadata and keep the real row first; preserve native text privileges, name lookup, and account-history deduplication.
+- Keep actual server rosters, statistics, moderation targets, and slots unchanged; remove the synthetic recipient when a second ready connection joins or the bridge is inactive.
+- Accept and document the extra client player count, F2 row, and possible additional one-per-player drop. Set `Chat.SoloChatRelay = false` to disable the trial.
+- Extend isolated Unity/Mono validation through native roster serialization/decoding, permissions, real client routing, Discord queues, command counts, and roster transitions.
+
 ## Valheim Discord Chat example 0.2.1 — 2026-10-01
 
 - Format `/stats` as an embed with separate statistic fields, a tracking-start field, and a storage warning only when needed.

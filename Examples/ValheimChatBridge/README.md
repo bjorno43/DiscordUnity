@@ -1,4 +1,4 @@
-# Valheim Discord Chat 0.2.1
+# Valheim Discord Chat 0.2.2 (experimental solo chat)
 
 A chat and moderation plugin for a **dedicated Valheim server with BepInEx 5**. Install it only on the server; players use unmodified clients. The project enables `AllowUnsafeBlocks`, uses C# 7.3 and targets .NET Standard 2.1 to match Valheim. DiscordUnity remains .NET Standard 2.0 and Unity/Mono compatible.
 
@@ -12,9 +12,19 @@ A chat and moderation plugin for a **dedicated Valheim server with BepInEx 5**. 
 
 All channels must be different guild text or announcement channels in the **same Discord server**. Leave optional IDs empty to disable those features. Pings, edits, attachments alone, system messages and other console commands are excluded. Discord names prefer nickname, then global display name, then username. Bot/webhook messages are ignored. Mentions cannot trigger notifications. Markup/control characters are flattened and long text truncated. Each chat queue holds 100 messages; new messages are dropped when full. There is no offline chat replay.
 
-**Admin-log coverage:** chat passing through the server is captured regardless of recipient distance. Valheim can deliver messages only locally without transmitting them to the server when there are no other permitted recipients. This also applies to `/s` shouts: a Global label in the client does not guarantee a packet was sent to the dedicated server. With only one player and vanilla platform permission routing, the message can remain local. A server plugin cannot observe those local-only messages. Whispers passing through the server are visible to administrators.
+**Admin-log coverage:** chat passing through the server is captured regardless of recipient distance. Vanilla can keep solo chat local, including `/s` shouts. This experimental release enables `Chat.SoloChatRelay` by default to make a spawned solo client send its native chat through the server. Whispers passing through the server are visible to administrators. The client's text-communication privilege must still be granted.
 
-**Vanilla incoming title:** Valheim 1.0.16 resolves names from existing players, ignoring an arbitrary `UserInfo.Name`. Incoming Discord chat appears approximately as `YourPlayername: [Discord] Nickname: Message`. This accepted limitation requires no client plugin and does not change the player roster.
+**Vanilla incoming title:** Valheim 1.0.16 resolves names from existing players, ignoring an arbitrary `UserInfo.Name`. Incoming Discord chat appears approximately as `YourPlayername: [Discord] Nickname: Message`. This accepted limitation requires no client plugin. The real player remains first in the client roster so platform-account name lookups continue to resolve that player.
+
+## Experimental solo chat
+
+When exactly one ready, connected player has spawned, the bridge is ready, and game-to-Discord or admin logging is enabled, the outgoing native `PlayerList` packet includes an additional row named **DiscordBot**. It copies the solo player's account metadata but has a different network recipient ID. The native self-account permission check permits this recipient without looking up a fabricated Steam or crossplay account. Native client routing sends the extra recipient's chat through the actual server, where the existing bridge captures it.
+
+DiscordBot has no connection, character object, AI, world position or public map marker. The server's real player list and world history are never extended. `/stats`, `/online`, moderation targets and server slots therefore continue to count real connections. Normal multiplayer packets are unchanged. DiscordBot is removed on the next native player-list update when another ready connection joins, the server becomes empty, or the bridge is no longer ready. An unspawned second ready connection also disables the synthetic recipient. A returning solo player gets it again after spawning.
+
+Accepted side effects: the solo client counts two players and its F2 connection panel shows DiscordBot. Drops configured as one per player may produce one additional item, regardless of distance; this release deliberately leaves that behavior unchanged. The copied account remains one identity in native history. Other client mods that count roster rows can also count DiscordBot. No client plugin or BetterChat update is required; BetterChat 0.1.7 Global/Local/Whisper use this native chat route. Its separate Private/Admin relay is outside this bridge.
+
+Set `Chat.SoloChatRelay = false` and restart to restore the original player-list packets and local-only solo chat. This feature is a gameplay trial: isolated native/Mono checks pass, but live Steam/crossplay sessions and actual F2 rendering still require acceptance testing.
 
 ## Commands
 
@@ -50,7 +60,7 @@ Statistics live in `BepInEx/config/ValheimDiscordChat/<worldUID>.json`, with a p
 ## Install or upgrade
 
 1. Stop the server and back up its configuration.
-2. Extract `ValheimDiscordChat-0.2.1.zip` into the server root, replacing the three DLLs under `BepInEx/plugins/ValheimDiscordChat/`. Remove duplicate older copies elsewhere.
+2. Extract `ValheimDiscordChat-0.2.2.zip` into the server root, replacing the three DLLs under `BepInEx/plugins/ValheimDiscordChat/`. Remove duplicate older copies elsewhere.
 3. Keep `BepInEx/config/icecub.ValheimDiscordChat.cfg`. BepInEx adds new settings on startup. First installations generate it automatically; a blank `.cfg.example` is included.
 4. Fill in channel IDs and moderator RoleIDs, then restart.
 
@@ -67,6 +77,7 @@ CommandsChannelId = YOUR_COMMANDS_CHANNEL_ID
 [Chat]
 GameToDiscord = true
 DiscordToGame = true
+SoloChatRelay = true
 MaxMessageLength = 500
 
 [Commands]
@@ -85,21 +96,23 @@ Look for `Discord chat bridge ready`, optional channel validation and command re
 
 The owner confirmed the 0.1.0 bridge working in gameplay. The 0.2.x features have offline/native/Unity-Mono validation and still need these checks using your real application:
 
-1. Join with two unmodified clients whose platform text-communication permissions allow messages between them. Send a shout, normal chat and whisper. Public Discord gets only the shout; admin Discord gets all three once.
+1. Join alone with an unmodified client and wait for `Experimental solo chat active`. Check F2 shows your character plus DiscordBot, while `/stats` and `/online` show only you. Send a shout, normal chat and whisper: public Discord gets only the shout; admin Discord gets all three once. Your text-communication privilege must permit chat.
 2. Send public Discord text. Both clients and admin log receive it. Admin/commands-channel posts do not enter game chat.
 3. Run `/stats` and `/online`. Check count, names, day, version and advancing uptime/durations.
 4. Die once, check `/stats`, restart and verify the count persists. Pre-installation deaths are excluded.
 5. Try moderation with an unlisted role and in the wrong channel; no action should occur. Repeat using an allowed role.
 6. Test `/alert` on both clients and `/setatspawn` on one. Verify arrival at the sacrifice stones and other players remain in place.
 7. Kick a test account, reconnect, then ban it. Confirm the Steam ID in the native ban list and reconnect refusal. Unban through Valheim before normal play.
+8. Join with a second client whose platform text-communication permissions allow messages between the two players. DiscordBot disappears after the next native roster update. Repeat the three chat types, then disconnect the second client: DiscordBot returns and solo chat still works. Disconnect/reconnect the solo client and repeat. Check that no DiscordBot account appears in persistent server statistics.
+9. Set `SoloChatRelay = false`, restart and check F2 has no DiscordBot. Solo chat may remain local again. Restore `true` and restart to resume the trial.
 
 ## No game chat appears in Discord
 
-First check the online count with `/online`. A solo test can produce local-only vanilla chat even for `/s`; the dedicated server receives nothing to relay. Test with two connected players allowed to communicate, then send `/s Test from Valheim`. The public channel should receive the shout and the admin channel should receive the shout, normal chat and whisper packets passing through the server.
+For solo tests, check `SoloChatRelay = true`, a spawned character, a ready Discord bridge, and `Experimental solo chat active` in the server log. Allow the next native player-list update after startup. F2 should show DiscordBot; `/online` must still show only the real player. Then send `/s Test from Valheim`. If the feature is disabled, vanilla solo chat can remain local and the server receives nothing to relay. Platform text-communication privilege denial is still respected.
 
 BetterChat 0.1.7 uses the same vanilla route for Global, Local and Whisper; its separate relay serves Private/Admin. The Discord plugin does not modify BetterChat or require a client extension. A public Discord message appearing in the admin channel is the intended one-way audit copy and does not establish that the game client has transmitted its own chat.
 
-The native Unity/Mono probe reproduces both paths: chat targeting only the local player produces no server packet; chat targeting another player traverses the dedicated server and is captured by the Discord bridge. See [TESTING.md](TESTING.md). Configuration/permission checks remain relevant if a two-player test also fails.
+The native Unity/Mono probe reproduces the original local-only route, then exercises the production roster patch, native roster decoding and native chat permission loop. Solo shouts reach the public relay and all three chat types reach the admin relay. It also checks unchanged server counts/history, command embeds, feature disablement and transitions between zero, one and two real players. See [TESTING.md](TESTING.md). Configuration/permission checks remain relevant if a two-player test also fails.
 
 ## Build and validation
 
