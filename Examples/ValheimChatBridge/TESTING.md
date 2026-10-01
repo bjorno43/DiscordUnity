@@ -8,7 +8,7 @@ Validated on October 1, 2026:
 | Release build against dedicated server 1.0.12 | Passed, 0 warnings / 0 errors |
 | Chat/command policy suite on .NET 8 | Passed, 52 assertions |
 | Native packet suite using installed client assemblies on .NET 8 | Passed, 13 assertions |
-| Isolated Unity Player / Mono, dedicated server 1.0.12 assemblies and production plugin | Passed, 52 integration checks |
+| Isolated Unity Player / Mono, dedicated server 1.0.12 assemblies and production plugin | Passed, 54 integration checks |
 | DiscordUnity regression suite on .NET 8 and .NET Framework 4.7.2 | Passed, 19 scenarios / 928 assertions per host |
 
 The native suite uses the game's `ZRpc.Serialize`, `UserInfo` and `ZRoutedRpc.RoutedRPCData` serialization. It checks chat decoding, unmodified vanilla bytes/read position, authenticated sender/player-object validation, ping exclusion, and malformed/oversized packets.
@@ -20,6 +20,7 @@ The [Unity/Mono integration probe](MonoSmoke/README.md) loads the production Har
 - Public shouts only; all three game chat types in the admin log; public Discord mirroring and one-way admin behavior.
 - Unchanged vanilla routing, recipient coalescing, intentional repeats, client guards, sender spoofing and incoming-message deduplication.
 - Per-recipient vanilla Discord chat packets and unchanged player rosters.
+- Native client routing reproduces local-only chat with no server packet, then verifies that a second-recipient chat packet traverses the server and reaches the production Discord relay.
 - Persisted death counting, duplicate/spoof rejection, restart reload, and importing offline world-history accounts without double-counting Steam players.
 - Wrong-role/wrong-channel denials, ephemeral responses, waiting for successful acknowledgement, failed acknowledgements, disconnects, duplicate commands, ambiguous names and non-Steam moderation refusal.
 - Actual native `Kicked` RPC and Valheim `SyncedList` persistence of the resolved Steam ID in an isolated ban file.

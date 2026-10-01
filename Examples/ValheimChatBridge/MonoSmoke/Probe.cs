@@ -298,6 +298,21 @@ public static class ChatBridgeProbe
             Check(registered.Count == 6 && registered["setatspawn"] == "setatspawn1", "All six guild commands register through production Discord REST");
             Check(http.Routes.Count(s => s == "/api/v10/applications/777/guilds/111/commands") == 6 &&
                 !http.Methods.Contains("PUT") && !http.Methods.Contains("DELETE"), "Command upserts preserve unrelated commands");
+            // Reproduce vanilla's local-only chat route before testing the second-recipient path.
+            // This is an actual client ZRoutedRpc transport, not an injected incoming chat packet.
+            var clientSocket = new MemorySocket { SteamId = "76561198000000100" };
+            var clientRouter = new ZRoutedRpc(false); clientRouter.SetUID(a.m_uid);
+            clientRouter.AddPeer(new ZNetPeer(clientSocket, true) { m_uid = 100 });
+            var clientUser = new UserInfo { Name = a.m_playerName, UserId = new PlatformUserID("Steam_76561198000000011") };
+            int beforeChat = outgoing.Count;
+            clientRouter.InvokeRoutedRPC(a.m_uid, "ChatMessage", Vector3.zero, (int)Talker.Type.Shout, clientUser, "Solo routing proof");
+            Check(clientSocket.Sent.Count == 0 && outgoing.Count == beforeChat, "Vanilla chat addressed only to the local player sends no server packet");
+            clientRouter.InvokeRoutedRPC(b.m_uid, "ChatMessage", Vector3.zero, (int)Talker.Type.Shout, clientUser, "Multiplayer routing proof");
+            Set(typeof(ZRoutedRpc), null, "s_instance", router);
+            var wire = new ZPackage(clientSocket.Sent.Single()); wire.ReadInt(); var forwarded = wire.ReadPackage();
+            Call(router, "RPC_RoutedRPC", a.m_rpc, forwarded);
+            Check(outgoing.Count == beforeChat + 1 && outgoing.Last() == "[Valheim] Viking One: Multiplayer routing proof",
+                "Vanilla chat addressed to a second player crosses the server and reaches the Discord relay");
             Call(plugin, "StopBridge");
             Check(outgoing.Count == 0 && incoming.Count == 0, "Shutdown clears pending relay messages");
         }

@@ -12,7 +12,7 @@ A chat and moderation plugin for a **dedicated Valheim server with BepInEx 5**. 
 
 All channels must be different guild text or announcement channels in the **same Discord server**. Leave optional IDs empty to disable those features. Pings, edits, attachments alone, system messages and other console commands are excluded. Discord names prefer nickname, then global display name, then username. Bot/webhook messages are ignored. Mentions cannot trigger notifications. Markup/control characters are flattened and long text truncated. Each chat queue holds 100 messages; new messages are dropped when full. There is no offline chat replay.
 
-**Admin-log coverage:** chat passing through the server is captured regardless of recipient distance. Valheim can deliver messages only locally without transmitting them to the server when there are no other permitted recipients. A server plugin cannot observe those local-only messages. Whispers passing through the server are visible to administrators.
+**Admin-log coverage:** chat passing through the server is captured regardless of recipient distance. Valheim can deliver messages only locally without transmitting them to the server when there are no other permitted recipients. This also applies to `/s` shouts: a Global label in the client does not guarantee a packet was sent to the dedicated server. With only one player and vanilla platform permission routing, the message can remain local. A server plugin cannot observe those local-only messages. Whispers passing through the server are visible to administrators.
 
 **Vanilla incoming title:** Valheim 1.0.16 resolves names from existing players, ignoring an arbitrary `UserInfo.Name`. Incoming Discord chat appears approximately as `YourPlayername: [Discord] Nickname: Message`. This accepted limitation requires no client plugin and does not change the player roster.
 
@@ -85,13 +85,21 @@ Look for `Discord chat bridge ready`, optional channel validation and command re
 
 The owner confirmed the 0.1.0 bridge working in gameplay. The 0.2.x features have offline/native/Unity-Mono validation and still need these checks using your real application:
 
-1. Join with two unmodified clients. Send a shout, normal chat and whisper. Public Discord gets only the shout; admin Discord gets all three once.
+1. Join with two unmodified clients whose platform text-communication permissions allow messages between them. Send a shout, normal chat and whisper. Public Discord gets only the shout; admin Discord gets all three once.
 2. Send public Discord text. Both clients and admin log receive it. Admin/commands-channel posts do not enter game chat.
 3. Run `/stats` and `/online`. Check count, names, day, version and advancing uptime/durations.
 4. Die once, check `/stats`, restart and verify the count persists. Pre-installation deaths are excluded.
 5. Try moderation with an unlisted role and in the wrong channel; no action should occur. Repeat using an allowed role.
 6. Test `/alert` on both clients and `/setatspawn` on one. Verify arrival at the sacrifice stones and other players remain in place.
 7. Kick a test account, reconnect, then ban it. Confirm the Steam ID in the native ban list and reconnect refusal. Unban through Valheim before normal play.
+
+## No game chat appears in Discord
+
+First check the online count with `/online`. A solo test can produce local-only vanilla chat even for `/s`; the dedicated server receives nothing to relay. Test with two connected players allowed to communicate, then send `/s Test from Valheim`. The public channel should receive the shout and the admin channel should receive the shout, normal chat and whisper packets passing through the server.
+
+BetterChat 0.1.7 uses the same vanilla route for Global, Local and Whisper; its separate relay serves Private/Admin. The Discord plugin does not modify BetterChat or require a client extension. A public Discord message appearing in the admin channel is the intended one-way audit copy and does not establish that the game client has transmitted its own chat.
+
+The native Unity/Mono probe reproduces both paths: chat targeting only the local player produces no server packet; chat targeting another player traverses the dedicated server and is captured by the Discord bridge. See [TESTING.md](TESTING.md). Configuration/permission checks remain relevant if a two-player test also fails.
 
 ## Build and validation
 

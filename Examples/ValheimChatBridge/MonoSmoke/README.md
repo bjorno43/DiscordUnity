@@ -1,6 +1,6 @@
 # Isolated Unity/Mono integration probe
 
-This is the source of the 52-check integration probe described in [TESTING.md](../TESTING.md). It requires a separate compatible Mono Unity Player test host, your own dedicated-server managed assemblies, and BepInEx 5. No game binaries, Unity Player, or BepInEx binaries are distributed here.
+This is the source of the 54-check integration probe described in [TESTING.md](../TESTING.md). It requires a separate compatible Mono Unity Player test host, your own dedicated-server managed assemblies, and BepInEx 5. No game binaries, Unity Player, or BepInEx binaries are distributed here.
 
 Build with `ManagedPath` pointing to the dedicated server's `valheim_server_Data/Managed` and `BepInExPath` to its `BepInEx/core`:
 
