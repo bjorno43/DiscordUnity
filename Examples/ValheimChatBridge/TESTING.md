@@ -24,11 +24,11 @@ The [Unity/Mono integration probe](MonoSmoke/README.md) loads the production Har
 - Wrong-role/wrong-channel denials, ephemeral responses, waiting for successful acknowledgement, failed acknowledgements, disconnects, duplicate commands, ambiguous names and non-Steam moderation refusal.
 - Actual native `Kicked` RPC and Valheim `SyncedList` persistence of the resolved Steam ID in an isolated ban file.
 - Native global center-screen announcement RPC and one-recipient distant-teleport RPC with vanilla spawn offset.
-- Stats/online reply contents, suppressed mentions, six guild command upserts preserving unrelated commands, and shutdown cleanup.
+- Stats/online embed fields and cleared plaintext content, suppressed mentions, six guild command upserts preserving unrelated commands, and shutdown cleanup.
 
 The teleport fixture supplies a deterministic world-spawn lookup result; it validates the production lookup name and RPC payload, not arrival in a fully generated world. Discord readiness and role payloads are simulated. These checks do not prove real command visibility, actual Discord bot permissions, client HUD rendering, teleport arrival, or gameplay reconnect refusal after a ban.
 
-The owner confirmed the previous 0.1.0 bidirectional bridge working in a real authenticated gameplay session. The new 0.2.0 features still require the live acceptance checks in [README.md](README.md). No real token was used or included in the probe/package.
+The owner confirmed the previous 0.1.0 bidirectional bridge working in a real authenticated gameplay session. The 0.2.x features still require the live acceptance checks in [README.md](README.md). No real token was used or included in the probe/package.
 
 Run policy checks without game files:
 

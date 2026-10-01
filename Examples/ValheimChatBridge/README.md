@@ -1,4 +1,4 @@
-# Valheim Discord Chat 0.2.0
+# Valheim Discord Chat 0.2.1
 
 A chat and moderation plugin for a **dedicated Valheim server with BepInEx 5**. Install it only on the server; players use unmodified clients. The project enables `AllowUnsafeBlocks`, uses C# 7.3 and targets .NET Standard 2.1 to match Valheim. DiscordUnity remains .NET Standard 2.0 and Unity/Mono compatible.
 
@@ -29,6 +29,8 @@ Use Discord's slash-command picker. Ordinary text containing `/stats` does not i
 | `/alert message:<text>` | Global center-screen announcement. | Configured moderator role. |
 | `/setatspawn player:<name or SteamID>` | Requests a distant teleport to world spawn, normally the sacrifice stones at `StartTemple`. | Configured moderator role. |
 
+`/stats` uses an embed with individual statistic fields and a full-width death-tracking date. `/online` uses one field per player, showing their session duration. An empty server gets a clear message; servers with more than 25 players show the first 25 alphabetically and indicate how many are omitted. Both embeds include an update timestamp.
+
 Moderation requires at least one role in `Commands.AllowedRoleIds`. Empty or invalid configuration denies all moderation, including Discord administrators. Guild, channel and roles are checked before queueing. Interactions are acknowledged promptly; game operations run on Unity's main thread only after successful acknowledgement. Moderation results and denials are ephemeral; `/stats` and `/online` results are visible in the commands channel. Replayed interactions are ignored. The server log records the requesting Discord user for moderation actions.
 
 Player names match exactly, ignoring case. Ambiguous names are refused; use the Steam ID instead. Targets must be online. Kick/ban refuse connections without an authenticated Steam ID, including non-Steam crossplay players, rather than banning a character name. Use Valheim's usual unban facilities to remove bans.
@@ -48,7 +50,7 @@ Statistics live in `BepInEx/config/ValheimDiscordChat/<worldUID>.json`, with a p
 ## Install or upgrade
 
 1. Stop the server and back up its configuration.
-2. Extract `ValheimDiscordChat-0.2.0.zip` into the server root, replacing the three DLLs under `BepInEx/plugins/ValheimDiscordChat/`. Remove duplicate older copies elsewhere.
+2. Extract `ValheimDiscordChat-0.2.1.zip` into the server root, replacing the three DLLs under `BepInEx/plugins/ValheimDiscordChat/`. Remove duplicate older copies elsewhere.
 3. Keep `BepInEx/config/icecub.ValheimDiscordChat.cfg`. BepInEx adds new settings on startup. First installations generate it automatically; a blank `.cfg.example` is included.
 4. Fill in channel IDs and moderator RoleIDs, then restart.
 
@@ -73,7 +75,7 @@ AllowedRoleIds = YOUR_ADMIN_ROLE_ID,YOUR_MODERATOR_ROLE_ID
 
 `DISCORD_BOT_TOKEN` overrides the token setting. Guild/application IDs are discovered automatically. Get numeric channel and role IDs through Developer Mode and Copy Channel ID / Copy Role ID. Configuration changes require restart. The ZIP never overwrites your actual token file or statistics.
 
-Enable **Message Content Intent** in the [Developer Portal](https://discord.com/developers/applications) for public Discord-to-game text. Give the bot **View Channel** and **Send Messages** in the configured channels. Install/invite with `bot` and `applications.commands`; users need **Use Application Commands**. Leave **Interactions Endpoint URL empty**, because commands arrive through the Gateway. See Discord's [application command](https://docs.discord.com/developers/interactions/application-commands) and [interaction delivery](https://docs.discord.com/developers/interactions/receiving-and-responding) documentation.
+Enable **Message Content Intent** in the [Developer Portal](https://discord.com/developers/applications) for public Discord-to-game text. Give the bot **View Channel** and **Send Messages** in the configured channels, plus **Embed Links** in the commands channel. Install/invite with `bot` and `applications.commands`; users need **Use Application Commands**. Leave **Interactions Endpoint URL empty**, because commands arrive through the Gateway. See Discord's [application command](https://docs.discord.com/developers/interactions/application-commands) and [interaction delivery](https://docs.discord.com/developers/interactions/receiving-and-responding) documentation.
 
 Administrator permission, Guild Members intent and Presence intent are unnecessary. The plugin enforces RoleIDs itself. Optionally restrict command visibility under Server Settings → Integrations → your application, while retaining server RoleIDs. Run one DiscordUnity connection per process; disable the separate ping example. Avoid conflicting library copies from other plugins.
 
@@ -81,7 +83,7 @@ Look for `Discord chat bridge ready`, optional channel validation and command re
 
 ## Live acceptance test
 
-The owner confirmed the 0.1.0 bridge working in gameplay. New 0.2.0 features have offline/native/Unity-Mono validation and still need these checks using your real application:
+The owner confirmed the 0.1.0 bridge working in gameplay. The 0.2.x features have offline/native/Unity-Mono validation and still need these checks using your real application:
 
 1. Join with two unmodified clients. Send a shout, normal chat and whisper. Public Discord gets only the shout; admin Discord gets all three once.
 2. Send public Discord text. Both clients and admin log receive it. Admin/commands-channel posts do not enter game chat.

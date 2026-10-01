@@ -282,8 +282,14 @@ public static class ChatBridgeProbe
             PumpCommand(plugin, Interaction("1007", "ban"));
             Check(File.ReadAllLines(banFile).Contains("76561198000000022"), "Ban persists Steam ID through Valheim's native ban list");
             PumpCommand(plugin, Interaction("1008", "stats")); PumpCommand(plugin, Interaction("1009", "online"));
-            Check(http.Bodies.Any(s => s.Contains("Recorded deaths: 1") && s.Contains("Players online: 3")), "Stats reply includes observed deaths and online player count");
-            Check(http.Bodies.Any(s => s.Contains("Viking Two") && s.Contains("Durations start")), "Online reply lists names and observed session durations");
+            var statsReply = http.Bodies.Select(JObject.Parse).Last(s => (string)s["embeds"]?.First?["title"] == "Valheim Server Stats");
+            var statsFields = (JArray)statsReply["embeds"][0]["fields"];
+            Check((string)statsReply["content"] == "" && statsFields.Any(f => (string)f["name"] == "Recorded deaths" && (string)f["value"] == "1") &&
+                statsFields.Any(f => (string)f["name"] == "Players online" && (string)f["value"] == "3"), "Stats reply embeds observed deaths and online count in separate fields");
+            var onlineReply = http.Bodies.Select(JObject.Parse).Last(s => (string)s["embeds"]?.First?["title"] == "Online Players");
+            Check(((JArray)onlineReply["embeds"][0]["fields"]).Count == 3 &&
+                onlineReply["embeds"][0]["fields"].Any(f => (string)f["name"] == "Viking Two" && ((string)f["value"]).StartsWith("Online for ")),
+                "Online reply embeds each player name and observed session duration");
             Check(http.Bodies.Where(s => s.Contains("allowed_mentions")).All(s => ((JArray)JObject.Parse(s)["allowed_mentions"]["parse"]).Count == 0), "Command result replies suppress Discord mentions");
             Set(typeof(DiscordAPI), null, "Rest", rest);
             registered.Clear();

@@ -14,7 +14,7 @@ using UnityEngine;
 
 namespace ValheimDiscordChat
 {
-    [BepInPlugin(Guid, "Valheim Discord Chat", "0.2.0")]
+    [BepInPlugin(Guid, "Valheim Discord Chat", "0.2.1")]
     public sealed partial class Plugin : BaseUnityPlugin
     {
         public const string Guid = "icecub.ValheimDiscordChat";

@@ -1,5 +1,12 @@
 # Changelog
 
+## Valheim Discord Chat example 0.2.1 — 2026-10-01
+
+- Format `/stats` as an embed with separate statistic fields, a tracking-start field, and a storage warning only when needed.
+- Format `/online` as an embed with a player field per connection, session durations, and an empty-server message. Show up to 25 players within Discord embed limits.
+- Remove the redundant offline-process notice from bot statistics replies; retain the operational explanation in documentation.
+- Keep moderation replies and permission checks unchanged. Document Embed Links permission for the commands channel.
+
 ## Valheim Discord Chat example 0.2.0 — 2026-10-01
 
 - Add a separate one-way administrator channel for shouts, normal chat, whispers, and public Discord messages relayed into the game.
@@ -11,14 +18,14 @@
 - Extend offline and Unity/Mono integration coverage for moderation authorization, acknowledgements, persistence and vanilla RPC delivery.
 - Add an object overload for deferred interaction replies so consumers can suppress mentions without losing the existing string overload.
 
-## Valheim Discord Chat example 0.1.0 â€” 2026-09-30
+## Valheim Discord Chat example 0.1.0 — 2026-09-30
 
 - Add a dedicated-server BepInEx 5 chat bridge with unsafe compilation enabled.
 - Relay only Valheim shouts to one Discord channel and human Discord text messages to all connected players.
 - Include private local token/channel configuration, bounded queues, loop prevention, nickname fallback, native packet and chat policy tests, and an installation ZIP builder.
 - Document the accepted vanilla player-name prefix for incoming Discord messages. A separate administrator channel is deferred until after the initial live tests.
 
-## 2.0.0 â€” 2026-09-30
+## 2.0.0 — 2026-09-30
 
 This version belongs to the bjorno43/DiscordUnity fork.
 

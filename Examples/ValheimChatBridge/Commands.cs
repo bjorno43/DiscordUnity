@@ -4,7 +4,6 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using UnityEngine;
 
@@ -113,7 +112,7 @@ namespace ValheimDiscordChat
                 if (!pending.Acknowledgement.IsCompleted) continue;
                 commands.RemoveAt(i);
                 if (!ReportResult(pending.Acknowledgement, "Command acknowledgement")) continue;
-                string result;
+                object result;
                 try { result = ExecuteCommand(pending.Name, pending.Value, pending.Target, pending.SteamId); }
                 catch (Exception ex)
                 {
@@ -121,11 +120,13 @@ namespace ValheimDiscordChat
                     result = "The command failed. Check the server log before retrying.";
                 }
                 if (CommandPolicy.IsAdmin(pending.Name)) Logger.LogInfo("Discord /" + pending.Name + " requested by user " + pending.Interaction.UserId + ": " + result);
-                replies.Add(pending.Interaction.EditOriginalResponse(new { content = result, allowed_mentions = new { parse = new string[0] } }));
+                var message = result as JObject ?? new JObject { ["content"] = (string)result, ["embeds"] = new JArray() };
+                message["allowed_mentions"] = new JObject { ["parse"] = new JArray() };
+                replies.Add(pending.Interaction.EditOriginalResponse(message));
             }
         }
 
-        private string ExecuteCommand(string name, string value, ZNetPeer target, string steamId)
+        private object ExecuteCommand(string name, string value, ZNetPeer target, string steamId)
         {
             if (!CanRelay || !commandsReady) return "The Valheim server is not ready.";
             if (name == "stats") return Stats();
@@ -164,35 +165,56 @@ namespace ValheimDiscordChat
             return "Unknown command.";
         }
 
-        private string Stats()
+        private JObject Stats()
         {
             var peers = network.GetPeers().Count(p => p.IsReady() && p.m_rpc.IsConnected());
             var data = statistics?.Data;
             string day = EnvMan.instance ? "Day " + EnvMan.instance.GetDay(network.GetTimeSeconds()) : "Unavailable (world loading)";
-            return "Server: **Online**\nUptime: " + CommandPolicy.Duration(DateTime.UtcNow - processStarted) +
-                "\nValheim version: " + global::Version.GetVersionString() + "\nIn-game day: " + day + "\nPlayers online: " + peers +
-                "\nUnique players (world history): " + (data == null ? "Unavailable" : data.Players.Count.ToString()) +
-                "\nRecorded deaths: " + (data == null ? "Unavailable" : data.Deaths.ToString()) +
-                (data == null ? "" : "\nDeath tracking since: " + data.TrackingSinceUtc.ToString("u")) +
-                (statistics != null && !statistics.IsPersistent ? "\nWarning: statistics storage could not be loaded or saved; current totals may not survive a restart." : "") +
-                "\nA server-hosted bot cannot answer commands while the server process is offline.";
+            var fields = new JArray
+            {
+                EmbedField("Server status", "Online"),
+                EmbedField("Uptime", CommandPolicy.Duration(DateTime.UtcNow - processStarted)),
+                EmbedField("Valheim version", global::Version.GetVersionString()),
+                EmbedField("In-game day", day),
+                EmbedField("Players online", peers.ToString()),
+                EmbedField("Unique players", data == null ? "Unavailable" : data.Players.Count.ToString()),
+                EmbedField("Recorded deaths", data == null ? "Unavailable" : data.Deaths.ToString())
+            };
+            if (data != null) fields.Add(EmbedField("Death tracking since", data.TrackingSinceUtc.ToString("yyyy-MM-dd HH:mm:ss 'UTC'"), false));
+            bool storageWarning = statistics != null && !statistics.IsPersistent;
+            if (storageWarning) fields.Add(EmbedField("Statistics storage warning", "Statistics could not be loaded or saved. Current totals may not survive a restart.", false));
+            return EmbedReply("Valheim Server Stats", fields, "Unique players: world history. Deaths: since tracking began.", storageWarning ? 0xFEE75C : 0x57F287);
         }
-        private string Online()
+        private JObject Online()
         {
-            var text = new StringBuilder(); int count = 0;
-            foreach (var peer in network.GetPeers().Where(p => p.IsReady() && p.m_rpc.IsConnected()).OrderBy(p => p.m_playerName, StringComparer.OrdinalIgnoreCase))
+            var peers = network.GetPeers().Where(p => p.IsReady() && p.m_rpc.IsConnected()).OrderBy(p => p.m_playerName, StringComparer.OrdinalIgnoreCase).ToList();
+            var fields = new JArray();
+            foreach (var peer in peers.Take(25))
             {
                 DateTime since;
                 string duration = statistics != null && statistics.Sessions.TryGetValue(peer, out since)
-                    ? CommandPolicy.Duration(DateTime.UtcNow - since) : "duration unavailable";
-                string player = ChatPolicy.ToDiscord(peer.m_playerName, duration, 100);
-                if (player != null && text.Length + player.Length < 1700) { text.AppendLine(player.Substring(10)); count++; }
+                    ? "Online for " + CommandPolicy.Duration(DateTime.UtcNow - since) : "Duration unavailable";
+                string name = ChatPolicy.Plain(peer.m_playerName, 80);
+                fields.Add(EmbedField(ChatPolicy.AuditDiscord(name.Length == 0 ? "Player" : name), duration));
             }
-            int total = network.GetPeers().Count(p => p.IsReady() && p.m_rpc.IsConnected());
-            return total == 0 ? "No players are online." : "Players online: " + total + "\n" + text +
-                (count < total ? "Additional players omitted to fit Discord's message limit.\n" : "") +
-                "Durations start when this plugin observes each connection.";
+            string description = peers.Count == 0 ? "No players are online." : "**" + peers.Count + "** " + (peers.Count == 1 ? "player connected." : "players connected.");
+            if (peers.Count > fields.Count) description += "\nShowing the first 25 players; " + (peers.Count - fields.Count) + " more are online.";
+            var reply = EmbedReply("Online Players", fields, "Session durations start when the plugin observes each connection.", 0x5865F2);
+            reply["embeds"][0]["description"] = description;
+            return reply;
         }
+        private static JObject EmbedField(string name, string value, bool inline = true)
+            => new JObject { ["name"] = name, ["value"] = value, ["inline"] = inline };
+        private static JObject EmbedReply(string title, JArray fields, string footer, int color)
+            => new JObject
+            {
+                ["content"] = "",
+                ["embeds"] = new JArray(new JObject
+                {
+                    ["title"] = title, ["color"] = color, ["fields"] = fields,
+                    ["footer"] = new JObject { ["text"] = footer }, ["timestamp"] = DateTime.UtcNow.ToString("o")
+                })
+            };
         private void ClearCommands()
         {
             Observe(registration); registration = null; registrationIndex = 0; registeredCommands.Clear(); interactionIds.Clear();
