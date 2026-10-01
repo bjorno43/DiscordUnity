@@ -1,27 +1,43 @@
-# Chat bridge validation
+# Chat and moderation validation
 
-Validated on September 30, 2026:
+Validated on October 1, 2026:
 
 | Check | Result |
 |---|---|
-| Release plugin build against installed Valheim client 1.0.16 assemblies | Passed, 0 warnings / 0 errors |
-| Release plugin build against installed dedicated server 1.0.12 assemblies | Passed, 0 warnings / 0 errors |
-| Chat policy suite on .NET 8 | Passed, 32 assertions |
-| Native packet suite using installed client game assemblies on .NET 8 | Passed, 13 assertions |
-| Isolated Unity Player / Mono using actual dedicated server 1.0.12 assemblies and the production plugin | Passed, 23 integration checks |
+| Release build against Valheim client 1.0.16 | Passed, 0 warnings / 0 errors |
+| Release build against dedicated server 1.0.12 | Passed, 0 warnings / 0 errors |
+| Chat/command policy suite on .NET 8 | Passed, 52 assertions |
+| Native packet suite using installed client assemblies on .NET 8 | Passed, 13 assertions |
+| Isolated Unity Player / Mono, dedicated server 1.0.12 assemblies and production plugin | Passed, 52 integration checks |
+| DiscordUnity regression suite on .NET 8 and .NET Framework 4.7.2 | Passed, 19 scenarios / 928 assertions per host |
 
-The native suite uses the game's `ZRpc.Serialize`, `UserInfo`, and `ZRoutedRpc.RoutedRPCData` serialization. It checks shout decoding, untouched vanilla bytes/read position, rejection of spoofed sender IDs or other players' objects, exclusion of normal chat/whispers/pings, and tolerance of malformed/oversized packets. The policy suite covers nickname fallback, channel/guild filtering, bot/webhook loops, readable mentions, control characters, Unicode truncation, Discord length/markdown constraints, bounded duplicate tracking, and per-recipient coalescing that preserves intentional repeats.
+The native suite uses the game's `ZRpc.Serialize`, `UserInfo` and `ZRoutedRpc.RoutedRPCData` serialization. It checks chat decoding, unmodified vanilla bytes/read position, authenticated sender/player-object validation, ping exclusion, and malformed/oversized packets.
 
-The [Unity/Mono integration probe](MonoSmoke/README.md) installs the actual production Harmony patches, generates the BepInEx configuration with an empty token, and routes native packets through three in-memory peers. It verifies authenticated shout capture, untouched vanilla delivery, recipient coalescing, intentional repeats, client guards, exclusion of normal/whisper/ping traffic, Discord event deduplication, per-recipient vanilla response packets with complete Discord text, unchanged player rosters, and queue cleanup. Discord connection readiness is simulated; no HTTP connection or bot login occurs in this probe.
+The policy suite covers nickname/channel/guild filtering, bot/webhook loops, readable mentions, control characters, Unicode and Discord text limits, duplicate tracking and recipient coalescing. Command checks cover role parsing, empty/invalid role denial, malformed options, Steam IDs, durations and slash-command definitions. Discord administrator permissions do not bypass configured roles.
 
-Run the policy suite without game files:
+The [Unity/Mono integration probe](MonoSmoke/README.md) loads the production Harmony patches and empty-token BepInEx configuration. Three in-memory game peers exercise native routing. A memory HTTP handler simulates Discord acknowledgements/replies and command registration; it never contacts Discord. Checks include:
+
+- Public shouts only; all three game chat types in the admin log; public Discord mirroring and one-way admin behavior.
+- Unchanged vanilla routing, recipient coalescing, intentional repeats, client guards, sender spoofing and incoming-message deduplication.
+- Per-recipient vanilla Discord chat packets and unchanged player rosters.
+- Persisted death counting, duplicate/spoof rejection, restart reload, and importing offline world-history accounts without double-counting Steam players.
+- Wrong-role/wrong-channel denials, ephemeral responses, waiting for successful acknowledgement, failed acknowledgements, disconnects, duplicate commands, ambiguous names and non-Steam moderation refusal.
+- Actual native `Kicked` RPC and Valheim `SyncedList` persistence of the resolved Steam ID in an isolated ban file.
+- Native global center-screen announcement RPC and one-recipient distant-teleport RPC with vanilla spawn offset.
+- Stats/online reply contents, suppressed mentions, six guild command upserts preserving unrelated commands, and shutdown cleanup.
+
+The teleport fixture supplies a deterministic world-spawn lookup result; it validates the production lookup name and RPC payload, not arrival in a fully generated world. Discord readiness and role payloads are simulated. These checks do not prove real command visibility, actual Discord bot permissions, client HUD rendering, teleport arrival, or gameplay reconnect refusal after a ban.
+
+The owner confirmed the previous 0.1.0 bidirectional bridge working in a real authenticated gameplay session. The new 0.2.0 features still require the live acceptance checks in [README.md](README.md). No real token was used or included in the probe/package.
+
+Run policy checks without game files:
 
 ```powershell
 dotnet restore Examples/ValheimChatBridge/Tests/ChatPolicyTests.csproj --configfile NuGet.Config
 dotnet run --project Examples/ValheimChatBridge/Tests/ChatPolicyTests.csproj -c Release
 ```
 
-Run native packet checks using your own installed game assemblies:
+Run native checks using your own game installation:
 
 ```powershell
 dotnet restore Examples/ValheimChatBridge/NativeTests/NativeTests.csproj --configfile NuGet.Config
@@ -29,4 +45,4 @@ dotnet build Examples/ValheimChatBridge/NativeTests/NativeTests.csproj -c Releas
 dotnet Examples/ValheimChatBridge/NativeTests/bin/Release/net8.0/NativeTests.dll
 ```
 
-The policy/packet hosts use .NET 8; the integration probe and plugin run on Unity/Mono. These checks do not prove real bot login, platform-specific chat permission behavior, or rendering on connected players. No real bot token or Discord message was used. Follow the live test steps in [README.md](README.md) on your test server. An administrator channel is outside this first test version.
+The policy/native hosts use .NET 8; the integration probe and production plugin use Unity/Mono. Own game/Unity/BepInEx binaries are required for the integration probe and are not distributed.

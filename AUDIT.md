@@ -18,7 +18,7 @@ Discord documents v10 as an available API version. REST now uses `https://discor
 | Closed `ClientWebSocket` reused | Fresh socket for each connection; cancel and observe the previous receive and heartbeat tasks |
 | Reconnect used the original URL and normal close | Preserve the READY session and `resume_gateway_url`; abort resumable failures |
 | Unmanaged `async void` heartbeat without cancellation | Managed task with jitter, ACK checks, and a recovery/backoff supervisor |
-| No recovery policy for protocol close codes | Stop on 4004/4010–4014; reset the session for codes including 4007/4009; interpret invalid-session data |
+| No recovery policy for protocol close codes | Stop on 4004/4010â€“4014; reset the session for codes including 4007/4009; interpret invalid-session data |
 | Session and READY data processed too late through callbacks | Update protocol state immediately; update game caches through Unity Update |
 | Unsafe callback queue | `ConcurrentQueue` and guards against callbacks from stopped connections |
 | Stop/start races and startup could wait indefinitely | Connection ownership, cancellable startup timeout, and immediate Stop completion |
@@ -51,7 +51,7 @@ Compatibility was tested inside Unity Editor 6000.0.75f1 with Mono, including pu
 ## Scope and limitations
 
 - No real bot token was supplied or collected from configuration files. Authenticated Identify/READY, message actions, and reconnects were tested using scripted transports. Public Discord Gateway discovery and HELLO were tested live.
-- The mod was not installed into a running Valheim client or server. The example plugin was built but was not tested during gameplay.
+- The owner subsequently confirmed the 0.1.0 dedicated-server chat bridge working in a real authenticated gameplay session. The 0.2.0 administrator channel and moderation commands have offline/native/Unity-Mono coverage; their live acceptance checks remain.
 - One bot connection and one shard are supported per process. A sharding requirement stops the connection with the relevant close code. IDENTIFY attempts are spaced at least five seconds apart within this connection, and discovery checks the remaining session starts. Multiple processes using one token must coordinate their start budget externally.
 - Ordinary REST requests are conservatively serialized. The implementation observes received limits and recovers from 429 responses; it is not a high-throughput scheduler for thousands of guilds. Interaction acknowledgements have a separate transport queue.
 - Voice-state/server events are exposed. Audio, codecs, and Discord voice/DAVE handshakes are not implemented; the original voice REST file was already empty.
@@ -59,4 +59,4 @@ Compatibility was tested inside Unity Editor 6000.0.75f1 with Mono, including pu
 - The historical upstream `.unitypackage` has been removed to avoid installing obsolete code. The packaging script includes the updated DLLs and source.
 - Correcting permission and timestamp sizes changes the public interface and requires existing mods to be rebuilt. See the migration table in the README.
 
-The remaining integration check is a bot session in a test guild within Valheim: startup, receiving text/slash commands, sending replies, recovery after network loss, and game shutdown. See [validation/RESULTS.md](validation/RESULTS.md) for the evidence behind the completed checks.
+Live acceptance checks remain for the new administrator channel and slash commands, including actual role/channel permissions, client HUD rendering, teleport arrival and reconnect refusal after a ban. See [validation/RESULTS.md](validation/RESULTS.md) for the evidence behind the completed checks.

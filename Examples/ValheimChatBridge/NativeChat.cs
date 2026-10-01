@@ -10,7 +10,7 @@ namespace ValheimDiscordChat
         private static void Prefix(ZRpc rpc, out ZRpc __state)
         {
             __state = Source;
-            Source = Plugin.Instance != null && Plugin.Instance.CanRelay ? rpc : null;
+            Source = Plugin.Instance != null && Plugin.Instance.CanObserveGame ? rpc : null;
         }
         private static Exception Finalizer(Exception __exception, ZRpc __state)
         {

@@ -84,5 +84,9 @@ namespace DiscordUnity
 
         public Task<RestResult<JObject>> EditOriginalResponse(string content)
             => DiscordAPI.EditOriginalInteractionResponse(ApplicationId, token, new { content });
+
+        /// <summary>Edit a deferred reply, including allowed_mentions and other message fields.</summary>
+        public Task<RestResult<JObject>> EditOriginalResponse(object data)
+            => DiscordAPI.EditOriginalInteractionResponse(ApplicationId, token, data);
     }
 }

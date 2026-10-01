@@ -44,14 +44,16 @@ namespace ValheimDiscordChat
             return result.ToString();
         }
 
-        internal static string ToDiscord(string playerName, string text, int limit)
+        internal static string AuditDiscord(string line) => TruncateEscaped(Markdown(line), 2000);
+
+        internal static string ToDiscord(string playerName, string text, int limit, string label = "[Valheim]")
         {
             var body = Plain(text, limit);
             if (body.Length == 0) return null;
             // Escaped text stays below Discord's 2,000-character content limit.
             var name = Plain(playerName, 80);
             if (name.Length == 0) name = "Player";
-            var prefix = "[Valheim] " + Markdown(name) + ": ";
+            var prefix = label + " " + Markdown(name) + ": ";
             return prefix + TruncateEscaped(Markdown(body), 2000 - prefix.Length);
         }
 

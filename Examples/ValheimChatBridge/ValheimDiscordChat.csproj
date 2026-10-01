@@ -4,7 +4,7 @@
     <LangVersion>7.3</LangVersion>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <AssemblyName>ValheimDiscordChat</AssemblyName>
-    <Version>0.1.0</Version>
+    <Version>0.2.0</Version>
     <Deterministic>true</Deterministic>
     <ValheimPath Condition="'$(ValheimPath)' == ''">$(VALHEIM_GAME_PATH)</ValheimPath>
     <ManagedPath Condition="'$(ManagedPath)' == '' and Exists('$(ValheimPath)/valheim_server_Data/Managed/assembly_valheim.dll')">$(ValheimPath)/valheim_server_Data/Managed</ManagedPath>

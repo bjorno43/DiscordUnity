@@ -1,13 +1,24 @@
 # Changelog
 
-## Valheim Discord Chat example 0.1.0 — 2026-09-30
+## Valheim Discord Chat example 0.2.0 — 2026-10-01
+
+- Add a separate one-way administrator channel for shouts, normal chat, whispers, and public Discord messages relayed into the game.
+- Register guild slash commands `/stats`, `/online`, `/kick`, `/ban`, `/alert`, and `/setatspawn`, restricted to the configured commands channel.
+- Require configured Discord RoleIDs for moderation; use authenticated Steam IDs and native Valheim kick/ban functions.
+- Send vanilla center-screen announcements and targeted distant teleports to world spawn without a client plugin.
+- Persist world-scoped unique player and death totals; seed unique players from Valheim world history. Deaths are observed from installation onward, including while Discord is disconnected.
+- Document server-hosted offline limitations, local-only chat, session duration coverage, configuration, upgrade and live testing.
+- Extend offline and Unity/Mono integration coverage for moderation authorization, acknowledgements, persistence and vanilla RPC delivery.
+- Add an object overload for deferred interaction replies so consumers can suppress mentions without losing the existing string overload.
+
+## Valheim Discord Chat example 0.1.0 â€” 2026-09-30
 
 - Add a dedicated-server BepInEx 5 chat bridge with unsafe compilation enabled.
 - Relay only Valheim shouts to one Discord channel and human Discord text messages to all connected players.
 - Include private local token/channel configuration, bounded queues, loop prevention, nickname fallback, native packet and chat policy tests, and an installation ZIP builder.
 - Document the accepted vanilla player-name prefix for incoming Discord messages. A separate administrator channel is deferred until after the initial live tests.
 
-## 2.0.0 — 2026-09-30
+## 2.0.0 â€” 2026-09-30
 
 This version belongs to the bjorno43/DiscordUnity fork.
 

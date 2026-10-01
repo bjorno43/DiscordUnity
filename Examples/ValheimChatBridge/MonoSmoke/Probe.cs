@@ -8,6 +8,10 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net;
+using System.Net.Http;
+using System.Threading;
+using System.Threading.Tasks;
 using UnityEngine;
 using ValheimDiscordChat;
 
@@ -24,7 +28,9 @@ public static class ChatBridgeProbe
     private sealed class MemorySocket : ISocket
     {
         internal readonly List<byte[]> Sent = new List<byte[]>();
-        public bool IsConnected() => true;
+        internal bool Connected = true;
+        internal string SteamId;
+        public bool IsConnected() => Connected;
         public void Send(ZPackage p) => Sent.Add(p.GetArray());
         public ZPackage Recv() => null;
         public int GetSendQueueSize() => 0;
@@ -39,7 +45,7 @@ public static class ChatBridgeProbe
         public ISocket Accept() => null;
         public int GetHostPort() => 0;
         public bool Flush() => true;
-        public string GetHostName() => "76561198000000000";
+        public string GetHostName() => SteamId;
         public void VersionMatch() { }
         internal List<ZRoutedRpc.RoutedRPCData> Routed()
         {
@@ -54,6 +60,43 @@ public static class ChatBridgeProbe
             return result;
         }
     }
+    private sealed class MemoryHttp : HttpMessageHandler
+    {
+        internal readonly List<string> Bodies = new List<string>();
+        internal readonly List<string> Routes = new List<string>();
+        internal readonly List<string> Methods = new List<string>();
+        internal TaskCompletionSource<HttpResponseMessage> Gate;
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellation)
+        {
+            Bodies.Add(request.Content == null ? "" : await request.Content.ReadAsStringAsync());
+            Routes.Add(request.RequestUri.AbsolutePath);
+            Methods.Add(request.Method.Method);
+            if (request.RequestUri.AbsolutePath.EndsWith("/commands"))
+                return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(JsonConvert.SerializeObject(new { id = (string)JObject.Parse(Bodies.Last())["name"] + "1" })) };
+            if (Gate != null && request.RequestUri.AbsolutePath.EndsWith("/callback")) return await Gate.Task;
+            return Response(request.RequestUri.AbsolutePath.EndsWith("/callback") ? HttpStatusCode.NoContent : HttpStatusCode.OK);
+        }
+        internal static HttpResponseMessage Response(HttpStatusCode code) => new HttpResponseMessage(code) { Content = new StringContent("{}") };
+    }
+    private static object Field(object target, string name) => AccessTools.Field(target.GetType(), name).GetValue(target);
+    private static void Wait(Task task) { if (!task.Wait(3000)) throw new Exception("Memory HTTP task timed out"); }
+    private static DiscordInteraction Interaction(string id, string command, string role = "555", string channel = "888", string player = "Viking Two")
+    {
+        var body = JObject.Parse("{'id':'" + id + "','application_id':'777','guild_id':'111','channel_id':'" + channel + "','type':2,'token':'memory-only-interaction','member':{'user':{'id':'444'},'roles':['" + role + "']},'data':{'id':'" + command + "1','name':'" + command + "','type':1}}");
+        if (command != "stats" && command != "online") body["data"]["options"] = new JArray(new JObject
+        { ["name"] = command == "alert" ? "message" : "player", ["type"] = 3, ["value"] = player });
+        return (DiscordInteraction)Activator.CreateInstance(typeof(DiscordInteraction), System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic, null, new object[] { body }, null);
+    }
+    private static void PumpCommand(Plugin plugin, DiscordInteraction interaction)
+    {
+        Call(plugin, "OnInteraction", interaction);
+        var queue = (System.Collections.IList)Field(plugin, "commands");
+        if (queue.Count != 0) Wait((Task)Field(queue[queue.Count - 1], "Acknowledgement"));
+        Call(plugin, "UpdateCommands");
+        foreach (var reply in (List<Task<RestResult<JObject>>>)Field(plugin, "replies")) Wait(reply);
+    }
+    private static bool SpawnIcon(string name, ref Vector3 pos, ref bool __result)
+    { Check(name == "StartTemple", "World-spawn lookup requests vanilla StartTemple"); pos = new Vector3(10, 20, 30); __result = true; return false; }
     private static void Receive(ZRoutedRpc router, ZNetPeer sender, long msgId, long target, int type, string text, bool local = false, long claimedSender = 11)
     {
         var data = new ZRoutedRpc.RoutedRPCData
@@ -88,6 +131,7 @@ public static class ChatBridgeProbe
             var c = new ZNetPeer(new MemorySocket(), false) { m_uid = 33, m_playerName = "Viking Three", m_characterID = new ZDOID(33, 1) };
             foreach (var peer in new[] { a, b, c })
             {
+                ((MemorySocket)peer.m_socket).SteamId = "765611980000000" + peer.m_uid;
                 network.GetPeers().Add(peer); router.AddPeer(peer);
                 var p = default(ZNet.PlayerInfo); p.m_name = peer.m_playerName; p.m_characterID = peer.m_characterID;
                 p.m_userInfo.m_id = new PlatformUserID("Steam_765611980000000" + peer.m_uid);
@@ -100,6 +144,12 @@ public static class ChatBridgeProbe
             Set(typeof(Plugin), plugin, "network", network); Set(typeof(Plugin), plugin, "ready", true);
             Set(typeof(Plugin), plugin, "ownsConnection", true); Set(typeof(Plugin), plugin, "channelId", "222");
             Set(typeof(Plugin), plugin, "guildId", "111"); Set(typeof(Plugin), plugin, "textLimit", 500);
+            Set(typeof(Plugin), plugin, "adminReady", true); Set(typeof(Plugin), plugin, "adminChannelId", "333");
+            var statsType = typeof(Plugin).Assembly.GetType("ValheimDiscordChat.ServerStatistics");
+            var stats = Activator.CreateInstance(statsType, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic, null,
+                new object[] { new Action<string>(s => { throw new Exception(s); }) }, null);
+            string statsFile = Path.Combine(root, "isolated-bepinex", "stats-probe-" + System.Guid.NewGuid().ToString("N") + ".json");
+            Call(stats, "Open", statsFile); Call(stats, "Tick", network); Set(typeof(Plugin), plugin, "statistics", stats);
             AccessTools.Property(typeof(DiscordAPI), "IsActive").SetValue(null, true);
             var outgoing = (Queue<string>)AccessTools.Field(typeof(Plugin), "outgoing").GetValue(plugin);
             Receive(router, a, 1, 22, 2, "Hello");
@@ -115,6 +165,8 @@ public static class ChatBridgeProbe
             Receive(router, a, 4, 22, 1, "Local", true); Receive(router, a, 5, 22, 0, "Whisper", true);
             Receive(router, a, 6, 22, 3, "Ping");
             Check(outgoing.Count == 2, "Normal chat, whispers and pings are excluded by production hooks");
+            var admin = (Queue<string>)Field(plugin, "adminOutgoing");
+            Check(admin.Count == 4 && admin.Contains("[Valheim Normal] Viking One: Local") && admin.Contains("[Valheim Whisper] Viking One: Whisper"), "Admin channel captures all chat types once and excludes map pings");
             Receive(router, a, 7, 22, 2, "Spoofed", claimedSender: 99);
             Check(outgoing.Count == 2, "Routed sender spoofing cannot publish to Discord");
             Set(typeof(ZNet), null, "m_isServer", false);
@@ -127,6 +179,10 @@ public static class ChatBridgeProbe
             Check(incoming.Count == 1, "Production Discord event accepts configured channel and nickname");
             Call(plugin, "OnDiscordEvent", "MESSAGE_CREATE", message);
             Check(incoming.Count == 1, "Production Discord event deduplicates replayed messages");
+            Check(admin.Count == 5 && admin.Last().Contains("Nick: Hi Vikings"), "Admin log mirrors public Discord chat once");
+            message["channel_id"] = "333"; message["id"] = "998";
+            Call(plugin, "OnDiscordEvent", "MESSAGE_CREATE", message);
+            Check(incoming.Count == 1 && admin.Count == 5, "Admin channel is one-way and does not create relay loops");
             foreach (var peer in new[] { a, b, c }) ((MemorySocket)peer.m_socket).Sent.Clear();
             Call(plugin, "Broadcast", incoming.Dequeue());
             foreach (var peer in new[] { a, b, c })
@@ -139,6 +195,103 @@ public static class ChatBridgeProbe
                 Check(user.UserId == player.m_userInfo.m_id && sent.m_parameters.ReadString() == "[Discord] Nick: Hi Vikings", "Each recipient gets their own known identity and complete Discord body " + peer.m_uid);
             }
             Check(network.GetPlayerList().Count == 3 && network.GetPlayerList()[0].m_name == "Viking One", "Player roster is unchanged");
+            var death = new ZRoutedRpc.RoutedRPCData { m_msgID = 90, m_senderPeerID = 11, m_targetPeerID = 0,
+                m_targetZDO = a.m_characterID, m_methodHash = "OnDeath".GetStableHashCode(), m_parameters = new ZPackage() };
+            Call(plugin, "Capture", a.m_rpc, death); Call(plugin, "Capture", a.m_rpc, death);
+            var saved = JObject.Parse(File.ReadAllText(statsFile));
+            Check((long)saved["Deaths"] == 1 && ((JObject)saved["Players"]).Count == 3, "Authenticated death is persisted once and Steam players are unique");
+            death.m_senderPeerID = 99; Call(plugin, "Capture", a.m_rpc, death);
+            Check((long)JObject.Parse(File.ReadAllText(statsFile))["Deaths"] == 1, "Spoofed death ignored");
+            var reloaded = Activator.CreateInstance(statsType, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic, null,
+                new object[] { new Action<string>(s => { throw new Exception(s); }) }, null);
+            Call(reloaded, "Open", statsFile); Call(reloaded, "Death", network, a);
+            Check((long)JObject.Parse(File.ReadAllText(statsFile))["Deaths"] == 1, "Restart reload preserves death total and rejects replay of last death");
+            var history = new World(); history.m_playerHistory.Add(new ZNet.CrossNetworkUserInfo { m_id = new PlatformUserID("Steam_76561198000000044"), m_displayName = "Past Player" });
+            history.m_playerHistory.Add(new ZNet.CrossNetworkUserInfo { m_id = new PlatformUserID("Steam_76561198000000011"), m_displayName = "Old Name" });
+            Set(typeof(ZNet), null, "m_world", history); Call(stats, "Tick", network); Call(stats, "Save");
+            Check(((JObject)JObject.Parse(File.ReadAllText(statsFile))["Players"]).Count == 4, "World history imports offline accounts and deduplicates online Steam accounts");
+            var http = new MemoryHttp();
+            var restType = typeof(DiscordAPI).Assembly.GetType("DiscordUnity.RestClient");
+            var rest = Activator.CreateInstance(restType, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic, null,
+                new object[] { new HttpClient(http), "memory-only-no-real-token" }, null);
+            Set(typeof(DiscordAPI), null, "InteractionRest", rest);
+            Set(typeof(Plugin), plugin, "applicationId", "777"); Set(typeof(Plugin), plugin, "commandsChannelId", "888");
+            Set(typeof(Plugin), plugin, "commandsReady", true); Set(typeof(Plugin), plugin, "roles", new HashSet<string> { "555" });
+            var registered = (Dictionary<string, string>)Field(plugin, "registeredCommands");
+            foreach (var name in new[] { "stats", "online", "kick", "ban", "alert", "setatspawn" }) registered[name] = name + "1";
+            foreach (var peer in new[] { a, b, c }) ((MemorySocket)peer.m_socket).Sent.Clear();
+            PumpCommand(plugin, Interaction("1001", "kick", role: "999"));
+            PumpCommand(plugin, Interaction("1002", "kick", channel: "222"));
+            Check(((MemorySocket)b.m_socket).Sent.Count == 0 && ((System.Collections.IList)Field(plugin, "commands")).Count == 0, "Wrong role and wrong channel never queue a kick");
+            Check(http.Bodies.All(s => (int)JObject.Parse(s)["type"] == 4 && (int)JObject.Parse(s)["data"]["flags"] == 64), "Unauthorized command denials are ephemeral");
+            http.Gate = new TaskCompletionSource<HttpResponseMessage>();
+            Call(plugin, "OnInteraction", Interaction("1003", "kick")); Call(plugin, "UpdateCommands");
+            Check(((MemorySocket)b.m_socket).Sent.Count == 0, "Moderation waits for successful Discord acknowledgement");
+            ((MemorySocket)b.m_socket).Connected = false;
+            http.Gate.SetResult(MemoryHttp.Response(HttpStatusCode.NoContent));
+            var pending = (System.Collections.IList)Field(plugin, "commands"); Wait((Task)Field(pending[0], "Acknowledgement"));
+            Call(plugin, "UpdateCommands");
+            Check(((MemorySocket)b.m_socket).Sent.Count == 0, "Player disconnect during acknowledgement prevents kick");
+            ((MemorySocket)b.m_socket).Connected = true; http.Gate = null;
+            http.Gate = new TaskCompletionSource<HttpResponseMessage>();
+            Call(plugin, "OnInteraction", Interaction("1010", "kick"));
+            http.Gate.SetResult(MemoryHttp.Response(HttpStatusCode.Forbidden));
+            pending = (System.Collections.IList)Field(plugin, "commands"); Wait((Task)Field(pending[0], "Acknowledgement"));
+            Call(plugin, "UpdateCommands");
+            Check(((MemorySocket)b.m_socket).Sent.Count == 0, "Failed acknowledgement prevents moderation action"); http.Gate = null;
+            PumpCommand(plugin, Interaction("1004", "alert", player: "Restart in five minutes"));
+            foreach (var peer in new[] { a, b, c })
+            {
+                var rpc = ((MemorySocket)peer.m_socket).Routed().Single();
+                Check(rpc.m_methodHash == "ShowMessage".GetStableHashCode() && rpc.m_parameters.ReadInt() == (int)MessageHud.MessageType.Center &&
+                    rpc.m_parameters.ReadString() == "Restart in five minutes", "Alert uses vanilla global center-screen RPC " + peer.m_uid);
+                ((MemorySocket)peer.m_socket).Sent.Clear();
+            }
+            PumpCommand(plugin, Interaction("1004", "alert", player: "Repeated"));
+            Check(((MemorySocket)a.m_socket).Sent.Count == 0, "Replayed interactions do not repeat game actions");
+            var zone = go.AddComponent<ZoneSystem>(); Set(typeof(ZoneSystem), null, "s_instance", zone);
+            var fixtureHarmony = new Harmony("isolated-chat-probe-spawn");
+            fixtureHarmony.Patch(AccessTools.Method(typeof(ZoneSystem), "GetLocationIcon"), prefix: new HarmonyMethod(AccessTools.Method(typeof(ChatBridgeProbe), "SpawnIcon")));
+            PumpCommand(plugin, Interaction("1005", "setatspawn"));
+            var teleport = ((MemorySocket)b.m_socket).Routed().Single();
+            Check(teleport.m_methodHash == "RPC_TeleportPlayer".GetStableHashCode() && teleport.m_targetPeerID == b.m_uid &&
+                teleport.m_parameters.ReadVector3() == new Vector3(10, 22, 30) && teleport.m_parameters.ReadQuaternion() == Quaternion.identity &&
+                teleport.m_parameters.ReadBool(), "Teleport targets one client with vanilla world-spawn offset and distant loading");
+            Check(((MemorySocket)a.m_socket).Sent.Count == 0 && ((MemorySocket)c.m_socket).Sent.Count == 0, "Teleport leaves other players untouched");
+            fixtureHarmony.UnpatchSelf();
+            string id, problem;
+            // Resolve authenticated IDs through the production method, never the forged chat author.
+            var resolveArgs = new object[] { "Viking Two", true, null, null };
+            var resolved = Call(plugin, "FindPlayer", resolveArgs);
+            id = (string)resolveArgs[2]; problem = (string)resolveArgs[3];
+            Check(ReferenceEquals(resolved, b) && id == "76561198000000022" && problem == null, "Player name resolves authenticated Steam ID");
+            b.m_playerName = a.m_playerName;
+            resolveArgs = new object[] { a.m_playerName, true, null, null }; resolved = Call(plugin, "FindPlayer", resolveArgs);
+            Check(resolved == null && ((string)resolveArgs[3]).Contains("ambiguous"), "Duplicate player names refuse moderation"); b.m_playerName = "Viking Two";
+            ((MemorySocket)b.m_socket).SteamId = "Xbox_123456789";
+            resolveArgs = new object[] { b.m_playerName, true, null, null }; resolved = Call(plugin, "FindPlayer", resolveArgs);
+            Check(resolved == null && ((string)resolveArgs[3]).Contains("no Steam ID"), "Non-Steam players cannot be banned by name instead of authenticated Steam ID");
+            ((MemorySocket)b.m_socket).SteamId = "76561198000000022";
+            Set(typeof(ZNet), null, "m_onlineBackend", OnlineBackendType.Steamworks);
+            ((MemorySocket)b.m_socket).Sent.Clear();
+            PumpCommand(plugin, Interaction("1006", "kick"));
+            var kicked = new ZPackage(((MemorySocket)b.m_socket).Sent.Single());
+            Check(kicked.ReadInt() == "Kicked".GetStableHashCode(), "Kick uses native Valheim authenticated Steam ID lookup and Kicked RPC");
+            var banFile = Path.Combine(root, "isolated-bepinex", "banned-probe-" + System.Guid.NewGuid().ToString("N") + ".txt");
+            Set(typeof(ZNet), network, "m_bannedList", new SyncedList(new FileHelpers.FileLocation(FileHelpers.FileSource.Local, banFile), "isolated probe"));
+            PumpCommand(plugin, Interaction("1007", "ban"));
+            Check(File.ReadAllLines(banFile).Contains("76561198000000022"), "Ban persists Steam ID through Valheim's native ban list");
+            PumpCommand(plugin, Interaction("1008", "stats")); PumpCommand(plugin, Interaction("1009", "online"));
+            Check(http.Bodies.Any(s => s.Contains("Recorded deaths: 1") && s.Contains("Players online: 3")), "Stats reply includes observed deaths and online player count");
+            Check(http.Bodies.Any(s => s.Contains("Viking Two") && s.Contains("Durations start")), "Online reply lists names and observed session durations");
+            Check(http.Bodies.Where(s => s.Contains("allowed_mentions")).All(s => ((JArray)JObject.Parse(s)["allowed_mentions"]["parse"]).Count == 0), "Command result replies suppress Discord mentions");
+            Set(typeof(DiscordAPI), null, "Rest", rest);
+            registered.Clear();
+            for (int attempts = 0; attempts < 100 && registered.Count < 6; attempts++)
+            { Call(plugin, "RegisterCommands"); Thread.Sleep(5); }
+            Check(registered.Count == 6 && registered["setatspawn"] == "setatspawn1", "All six guild commands register through production Discord REST");
+            Check(http.Routes.Count(s => s == "/api/v10/applications/777/guilds/111/commands") == 6 &&
+                !http.Methods.Contains("PUT") && !http.Methods.Contains("DELETE"), "Command upserts preserve unrelated commands");
             Call(plugin, "StopBridge");
             Check(outgoing.Count == 0 && incoming.Count == 0, "Shutdown clears pending relay messages");
         }

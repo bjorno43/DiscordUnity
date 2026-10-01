@@ -123,7 +123,7 @@ Use a `JObject` containing `JValue.CreateNull()` to explicitly clear a field; or
 
 [Examples/ValheimBot](Examples/ValheimBot/README.md) contains a minimal BepInEx 5 plugin, disabled by default. The example targets .NET Standard 2.1 to match the current Valheim assemblies; the DiscordUnity library remains .NET Standard 2.0.
 
-[Valheim Discord Chat](Examples/ValheimChatBridge/README.md) is a dedicated-server example bridging Valheim shouts (`/s`) and one Discord text channel. It requires no client mod and includes configuration, offline/native packet tests, and an installation package builder. See its README for the accepted vanilla player-name prefix on incoming Discord messages.
+[Valheim Discord Chat](Examples/ValheimChatBridge/README.md) is a dedicated-server BepInEx plugin with public shout chat, a one-way administrator chat log, and guild slash commands for statistics, online players, role-controlled kick/ban, global alerts, and teleport to world spawn. It requires no client mod and includes persistent world statistics, offline/native/Unity-Mono tests, and an installation package builder. See its README for the accepted vanilla player-name prefix on incoming Discord messages.
 
 ```powershell
 dotnet restore src/DiscordUnity.sln --configfile NuGet.Config
@@ -139,4 +139,4 @@ dotnet build src/DiscordUnityTests/DiscordUnityTests.csproj -c Release -f net8.0
 
 The optional `--network-smoke` argument retrieves only the public Gateway URL and HELLO. See [validation/README.md](validation/README.md) for Unity validation instructions and [validation/RESULTS.md](validation/RESULTS.md) for the scope of the results.
 
-Voice audio, sharding, and user login are not implemented. A full authenticated bot session inside a running Valheim client or server, using your bot and permissions, remains the final integration check.
+Voice audio, sharding, and user login are not implemented. The server-only chat bridge has been confirmed working in an authenticated gameplay session by its server owner. The new moderation commands and administrator channel still need live verification with your bot, Discord roles, and connected clients.

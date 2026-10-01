@@ -6,6 +6,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="../ChatPolicy.cs" Link="ChatPolicy.cs" />
+    <Compile Include="../CommandPolicy.cs" Link="CommandPolicy.cs" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
   </ItemGroup>
 </Project>

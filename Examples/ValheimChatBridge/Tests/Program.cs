@@ -55,6 +55,8 @@ internal static class Program
             Check(ChatPolicy.ToDiscord("Viking", "*test* @everyone", 500) == "[Valheim] Viking: \\*test\\* @everyone", "markdown escaping");
             var maximum = ChatPolicy.ToDiscord(new string('*', 80), new string('*', 1500), 1500);
             Check(maximum.Length <= 2000 && !maximum.EndsWith("\\"), "Discord limit respects escaping");
+            maximum = ChatPolicy.ToDiscord(new string('*', 80), new string('*', 1500), 1500, "[Valheim Whisper]");
+            Check(maximum.Length <= 2000 && !maximum.EndsWith("\\"), "admin prefix respects Discord content limit");
             Check(ChatPolicy.IsSnowflake("18446744073709551615"), "64-bit Discord ID");
             Check(!ChatPolicy.IsSnowflake("0") && !ChatPolicy.IsSnowflake("-1") && !ChatPolicy.IsSnowflake("channel"), "invalid configuration IDs");
 
@@ -74,6 +76,28 @@ internal static class Program
             Check(ids.Accept("1"), "duplicate memory bounded");
             ids.Clear();
             Check(ids.Accept("513"), "new session resets IDs");
+            var roles = CommandPolicy.ParseRoles("123, 456;789\n123");
+            Check(roles.Count == 3, "role configuration supports separators and deduplicates");
+            Check(CommandPolicy.HasRole(JObject.Parse("{'roles':['999','456']}"), roles), "configured moderator role accepted");
+            Check(!CommandPolicy.HasRole(JObject.Parse("{'roles':['999'],'permissions':'8'}"), roles), "Discord administrator permission does not bypass role configuration");
+            Check(!CommandPolicy.HasRole(JObject.Parse("{'roles':[456]}"), roles), "malformed numeric role rejected");
+            Check(!CommandPolicy.HasRole(null, roles), "DM or missing member rejected");
+            Check(!CommandPolicy.HasRole(JObject.Parse("{'roles':['456']}"), CommandPolicy.ParseRoles("")), "empty configuration denies moderation");
+            bool rejected = false;
+            try { CommandPolicy.ParseRoles("456,moderator"); } catch (FormatException) { rejected = true; }
+            Check(rejected, "invalid role configuration fails closed");
+            Check(CommandPolicy.Option(JObject.Parse("{'options':[{'name':'player','type':3,'value':' Viking One '}]}"), "player") == "Viking One", "exact player string option");
+            Check(CommandPolicy.Option(JObject.Parse("{'options':[{'name':'player','type':6,'value':'123'}]}"), "player") == null, "Discord user option cannot substitute game player");
+            Check(CommandPolicy.Option(JObject.Parse("{'options':[{'name':'message','type':3,'value':'Hi'}]}"), "player") == null, "wrong option rejected");
+            Check(CommandPolicy.Option(JObject.Parse("{'options':['bad']}"), "player") == null, "malformed options rejected");
+            Check(CommandPolicy.IsSteamId("76561198000000011") && !CommandPolicy.IsSteamId("123") && !CommandPolicy.IsSteamId("Steam_76561198000000011"), "individual Steam ID validation");
+            Check(CommandPolicy.Duration(TimeSpan.FromSeconds(90061)) == "1d 1h 1m 1s", "long session duration formatting");
+            foreach (var name in CommandPolicy.Names)
+            {
+                var definition = (JObject)CommandPolicy.Definition(name);
+                Check((string)definition["name"] == name && (int)definition["type"] == 1 &&
+                    (definition["options"] != null) == CommandPolicy.IsAdmin(name), "slash definition " + name);
+            }
             Console.WriteLine("PASS chat policy: " + assertions + " assertions.");
             return 0;
         }

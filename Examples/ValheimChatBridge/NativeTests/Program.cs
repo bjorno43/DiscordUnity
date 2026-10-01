@@ -41,8 +41,8 @@ internal static class Program
             Check(NativeChatReader.TryRead(shout, 10, character, out type, out text) && type == 2 && text == "Hello Discord", "native shout");
             Check(before.SequenceEqual(shout.m_parameters.GetArray()) && shout.m_parameters.ReadVector3() == new Vector3(1, 2, 3), "vanilla bytes and read position preserved");
             Check(!NativeChatReader.TryRead(shout, 99, character, out type, out text), "forged routed sender rejected");
-            Check(!NativeChatReader.TryRead(Packet("Say", 1, character), 10, character, out type, out text), "normal chat excluded");
-            Check(!NativeChatReader.TryRead(Packet("Say", 0, character), 10, character, out type, out text), "whispers excluded");
+            Check(NativeChatReader.TryRead(Packet("Say", 1, character), 10, character, out type, out text) && type == 1, "normal chat available to admin log");
+            Check(NativeChatReader.TryRead(Packet("Say", 0, character), 10, character, out type, out text) && type == 0, "whispers available to admin log");
             Check(!NativeChatReader.TryRead(Packet("ChatMessage", 3, ZDOID.None), 10, character, out type, out text), "map pings excluded");
             Check(NativeChatReader.TryRead(Packet("Say", 2, character), 10, character, out type, out text), "player-object shout supported");
             Check(!NativeChatReader.TryRead(Packet("Say", 2, new ZDOID(99, 1)), 10, character, out type, out text), "other player's object rejected");

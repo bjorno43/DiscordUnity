@@ -22,7 +22,7 @@ namespace ValheimDiscordChat
                 var parameters = new ZPackage(data.m_parameters.GetArray());
                 if (global) parameters.ReadVector3();
                 type = parameters.ReadInt();
-                if (type != (int)Talker.Type.Shout) return false;
+                if (type < (int)Talker.Type.Whisper || type > (int)Talker.Type.Shout) return false;
                 parameters.ReadString(); // UserInfo.Name is untrusted; use the server's peer name.
                 parameters.ReadString(); // UserInfo.UserId
                 text = parameters.ReadString();
@@ -30,6 +30,12 @@ namespace ValheimDiscordChat
             }
             catch (Exception) { return false; }
         }
+
+        internal static bool IsDeath(ZRoutedRpc.RoutedRPCData data, long sender, ZDOID character)
+            => data != null && sender != 0 && data.m_senderPeerID == sender && !character.IsNone() &&
+                data.m_targetZDO == character && data.m_targetPeerID == ZRoutedRpc.Everybody &&
+                data.m_methodHash == "OnDeath".GetStableHashCode() &&
+                data.m_parameters != null && data.m_parameters.Size() == 0;
     }
 
 }

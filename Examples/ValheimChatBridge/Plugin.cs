@@ -8,38 +8,47 @@ using HarmonyLib;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Threading.Tasks;
 using UnityEngine;
 
 namespace ValheimDiscordChat
 {
-    [BepInPlugin(Guid, "Valheim Discord Chat", "0.1.0")]
-    public sealed class Plugin : BaseUnityPlugin
+    [BepInPlugin(Guid, "Valheim Discord Chat", "0.2.0")]
+    public sealed partial class Plugin : BaseUnityPlugin
     {
         public const string Guid = "icecub.ValheimDiscordChat";
         internal static Plugin Instance { get; private set; }
         private const int QueueLimit = 100;
         private readonly Queue<string> outgoing = new Queue<string>();
         private readonly Queue<string> incoming = new Queue<string>();
+        private readonly Queue<string> adminOutgoing = new Queue<string>();
         private readonly ChatCoalescer coalescer = new ChatCoalescer();
         private readonly RecentIds gameIds = new RecentIds();
         private readonly RecentIds discordIds = new RecentIds();
         private ConfigEntry<bool> modEnabled, toDiscord, toGame;
-        private ConfigEntry<string> token, channel;
+        private ConfigEntry<string> token, channel, adminChannel, commandsChannel, allowedRoleIds;
         private ConfigEntry<int> maxLength;
         private Harmony harmony;
         private ZNet network;
         private bool attempted, ownsConnection, ready, clientWarning;
-        private string channelId, guildId;
+        private string channelId, guildId, adminChannelId, commandsChannelId, applicationId;
         private int textLimit;
         private float nextQueueWarning;
         private Task<bool> startup;
         private Task<RestResult<DiscordChannel>> channelLookup;
         private Task<RestResult<DiscordMessage>> send;
+        private Task<RestResult<DiscordMessage>> adminSend;
+        private Task<RestResult<DiscordChannel>> adminLookup, commandsLookup;
+        private bool adminReady, commandsReady;
+        private ServerStatistics statistics;
+        private float nextStatisticsTick;
         private DiscordUnity.ILogger previousLogger;
         private BotLogger botLogger;
 
         internal bool CanRelay => ready && ownsConnection && DiscordAPI.IsActive && network &&
+            network == ZNet.instance && network.IsServer() && network.IsDedicated();
+        internal bool CanObserveGame => modEnabled != null && modEnabled.Value && network &&
             network == ZNet.instance && network.IsServer() && network.IsDedicated();
 
         private void Awake()
@@ -48,6 +57,9 @@ namespace ValheimDiscordChat
             modEnabled = Config.Bind("General", "Enabled", true, "Enable the bridge on a dedicated server. Restart after changing settings.");
             token = Config.Bind("Discord", "BotToken", "", "Private Discord bot token. DISCORD_BOT_TOKEN overrides this value if set.");
             channel = Config.Bind("Discord", "ChannelId", "", "Discord text channel ID. Enable Developer Mode and use Copy Channel ID.");
+            adminChannel = Config.Bind("Discord", "AdminChannelId", "", "Optional separate channel for all game chat, including normal chat and whispers. One-way only.");
+            commandsChannel = Config.Bind("Discord", "CommandsChannelId", "", "Optional separate channel where slash commands may be used. Must be in the same Discord server.");
+            allowedRoleIds = Config.Bind("Commands", "AllowedRoleIds", "", "Comma-separated Discord role IDs allowed to kick, ban, alert and setatspawn. Empty denies all moderation actions.");
             toDiscord = Config.Bind("Chat", "GameToDiscord", true, "Forward only shouts (/s) to Discord. Normal chat, whispers and pings are excluded.");
             toGame = Config.Bind("Chat", "DiscordToGame", true, "Forward human text messages from the configured channel to all connected players.");
             maxLength = Config.Bind("Chat", "MaxMessageLength", 500, new ConfigDescription("Maximum relayed message length, excluding name/prefix.", new AcceptableValueRange<int>(32, 1500)));
@@ -61,6 +73,7 @@ namespace ValheimDiscordChat
             var current = ZNet.instance;
             if (current != network)
             {
+                statistics?.Save(); statistics = null;
                 StopBridge();
                 network = current;
                 attempted = false;
@@ -72,6 +85,16 @@ namespace ValheimDiscordChat
                 return;
             }
             if (!modEnabled.Value) { if (ownsConnection) StopBridge(); return; }
+            if (statistics == null && network.GetWorld() != null)
+            {
+                statistics = new ServerStatistics(message => Logger.LogWarning(message));
+                statistics.Open(Path.Combine(Paths.ConfigPath, "ValheimDiscordChat", network.GetWorldUID() + ".json"));
+            }
+            if (statistics != null && Time.realtimeSinceStartup >= nextStatisticsTick)
+            {
+                nextStatisticsTick = Time.realtimeSinceStartup + 1;
+                statistics.Tick(network);
+            }
             if (!attempted) StartBridge();
             if (!ownsConnection) return;
             DiscordAPI.Update();
@@ -84,6 +107,7 @@ namespace ValheimDiscordChat
                 return;
             }
             if (!CanRelay) return;
+            UpdateCommands();
             if (send != null && send.IsCompleted)
             {
                 ReportResult(send, "Discord message");
@@ -94,6 +118,10 @@ namespace ValheimDiscordChat
                 {
                     Content = outgoing.Dequeue(), AllowedMentions = new { parse = new string[0] }
                 });
+            if (adminSend != null && adminSend.IsCompleted) { ReportResult(adminSend, "Admin chat message"); adminSend = null; }
+            if (adminReady && adminSend == null && adminOutgoing.Count != 0)
+                adminSend = DiscordAPI.CreateMessage(adminChannelId, new DiscordMessageOptions
+                { Content = adminOutgoing.Dequeue(), AllowedMentions = new { parse = new string[0] } });
             for (int i = 0; i < 8 && incoming.Count != 0; i++) Broadcast(incoming.Dequeue());
         }
 
@@ -102,6 +130,13 @@ namespace ValheimDiscordChat
             attempted = true;
             string secret = (Environment.GetEnvironmentVariable("DISCORD_BOT_TOKEN") ?? token.Value).Trim();
             channelId = channel.Value.Trim();
+            adminChannelId = adminChannel.Value.Trim(); commandsChannelId = commandsChannel.Value.Trim();
+            try { roles = CommandPolicy.ParseRoles(allowedRoleIds.Value); }
+            catch (FormatException) { roles = new HashSet<string>(); Logger.LogError("AllowedRoleIds contains an invalid ID. All moderation commands are denied."); }
+            if (!OptionalChannel(adminChannelId, "AdminChannelId") || !OptionalChannel(commandsChannelId, "CommandsChannelId")) return;
+            if ((adminChannelId.Length != 0 && adminChannelId == channelId) ||
+                (commandsChannelId.Length != 0 && (commandsChannelId == channelId || commandsChannelId == adminChannelId)))
+            { Logger.LogError("Public chat, admin chat and commands must use separate channel IDs."); return; }
             textLimit = Math.Max(32, Math.Min(1500, maxLength.Value));
             if (secret.Length == 0 || !ChatPolicy.IsSnowflake(channelId))
             {
@@ -117,6 +152,7 @@ namespace ValheimDiscordChat
             botLogger = new BotLogger(Logger, secret);
             DiscordAPI.Logger = botLogger;
             DiscordAPI.GatewayEventReceived += OnDiscordEvent;
+            DiscordAPI.InteractionCreated += OnInteraction;
             ownsConnection = true;
             startup = DiscordAPI.StartWithBot(secret, new DiscordBotOptions
             {
@@ -140,6 +176,8 @@ namespace ValheimDiscordChat
                     return;
                 }
                 channelLookup = DiscordAPI.GetChannel(channelId);
+                if (adminChannelId.Length != 0) adminLookup = DiscordAPI.GetChannel(adminChannelId);
+                if (commandsChannelId.Length != 0) commandsLookup = DiscordAPI.GetChannel(commandsChannelId);
             }
             if (channelLookup != null && channelLookup.IsCompleted)
             {
@@ -157,32 +195,61 @@ namespace ValheimDiscordChat
                 ready = true;
                 Logger.LogInfo("Discord chat bridge ready. Valheim shouts and the configured Discord channel are linked.");
             }
+            if (!ready) return;
+            CheckExtraChannel(ref adminLookup, ref adminReady, "Admin chat");
+            CheckExtraChannel(ref commandsLookup, ref commandsReady, "Commands");
+            RegisterCommands();
+        }
+
+        private bool OptionalChannel(string id, string setting)
+        {
+            if (id.Length == 0 || ChatPolicy.IsSnowflake(id)) return true;
+            Logger.LogError(setting + " must be empty or a numeric Discord channel ID."); return false;
+        }
+        private void CheckExtraChannel(ref Task<RestResult<DiscordChannel>> lookup, ref bool available, string label)
+        {
+            if (lookup == null || !lookup.IsCompleted) return;
+            var result = lookup; lookup = null;
+            if (!ReportResult(result, label + " channel lookup")) return;
+            var data = result.Result.Data;
+            available = data.GuildId == guildId && (data.Type == ChannelType.GUILD_TEXT || data.Type == ChannelType.GUILD_NEWS);
+            if (available) Logger.LogInfo(label + " channel validated.");
+            else Logger.LogError(label + " channel must be a text or announcement channel in the public channel's Discord server. This feature is disabled.");
         }
 
         internal void Capture(ZRpc source, ZRoutedRpc.RoutedRPCData packet)
         {
-            if (!CanRelay || !toDiscord.Value) return;
+            if (!CanObserveGame) return;
             try
             {
                 ZNetPeer sender = null;
                 foreach (var peer in network.GetPeers())
                     if (ReferenceEquals(peer.m_rpc, source) && peer.IsReady() && source.IsConnected()) { sender = peer; break; }
                 if (sender == null) return;
+                if (NativeChatReader.IsDeath(packet, sender.m_uid, sender.m_characterID)) statistics?.Death(network, sender);
+                if (!CanRelay || (!toDiscord.Value && !adminReady)) return;
                 int type; string text;
                 if (!NativeChatReader.TryRead(packet, sender.m_uid, sender.m_characterID, out type, out text)) return;
                 if (!gameIds.Accept(sender.m_uid + ":" + packet.m_msgID)) return;
                 if (!coalescer.Accept(sender.m_uid, type, text, packet.m_targetPeerID, Time.realtimeSinceStartup)) return;
                 var line = ChatPolicy.ToDiscord(sender.m_playerName, text, textLimit);
-                if (line != null) Enqueue(outgoing, line);
+                if (line == null) return;
+                if (toDiscord.Value && type == (int)Talker.Type.Shout) Enqueue(outgoing, line);
+                if (adminReady) Enqueue(adminOutgoing, ChatPolicy.ToDiscord(sender.m_playerName, text, textLimit, "[Valheim " + ((Talker.Type)type) + "]"));
             }
             catch (Exception exception) { Logger.LogWarning("A chat packet could not be relayed (" + exception.GetType().Name + "). Vanilla delivery continues."); }
         }
 
         private void OnDiscordEvent(string name, JToken data)
         {
+            if (name == "READY") { applicationId = (string)data["application"]?["id"]; return; }
             if (!CanRelay || !toGame.Value || name != "MESSAGE_CREATE") return;
             var line = ChatPolicy.FromDiscord(data, guildId, channelId, textLimit);
-            if (line != null && discordIds.Accept((string)data["id"])) Enqueue(incoming, line);
+            if (line != null && discordIds.Accept((string)data["id"]))
+            {
+                Enqueue(incoming, line);
+                if (adminReady) Enqueue(adminOutgoing, ChatPolicy.AuditDiscord(line));
+            }
         }
 
         private void Enqueue(Queue<string> queue, string line)
@@ -232,18 +299,22 @@ namespace ValheimDiscordChat
 
         private void StopBridge()
         {
-            ready = false;
+            ready = false; adminReady = false; commandsReady = false;
             if (ownsConnection)
             {
                 DiscordAPI.GatewayEventReceived -= OnDiscordEvent;
+                DiscordAPI.InteractionCreated -= OnInteraction;
                 DiscordAPI.Stop();
                 DiscordAPI.Update();
                 if (ReferenceEquals(DiscordAPI.Logger, botLogger)) DiscordAPI.Logger = previousLogger;
             }
             ownsConnection = false;
             // Observe faults without waiting or carrying messages into a subsequent world session.
-            Observe(startup); Observe(channelLookup); Observe(send);
+            Observe(startup); Observe(channelLookup); Observe(send); Observe(adminSend); Observe(adminLookup); Observe(commandsLookup);
             startup = null; channelLookup = null; send = null;
+            adminSend = null; adminLookup = null; commandsLookup = null; applicationId = null;
+            ClearCommands();
+            adminOutgoing.Clear();
             outgoing.Clear(); incoming.Clear(); coalescer.Clear(); gameIds.Clear(); discordIds.Clear();
         }
 
@@ -255,6 +326,7 @@ namespace ValheimDiscordChat
 
         private void OnDestroy()
         {
+            statistics?.Save();
             StopBridge();
             harmony?.UnpatchSelf();
             if (Instance == this) Instance = null;

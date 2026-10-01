@@ -1,4 +1,4 @@
-## Valheim Discord Chat 0.1.0 - dedicated server only
+## Valheim Discord Chat 0.2.0 - dedicated server only
 ## Copy to BepInEx/config/icecub.ValheimDiscordChat.cfg, or let the plugin generate it.
 ## Restart the server after editing this file. Keep the token private.
 
@@ -8,8 +8,14 @@ Enabled = true
 [Discord]
 BotToken =
 ChannelId =
+AdminChannelId =
+CommandsChannelId =
 
 [Chat]
 GameToDiscord = true
 DiscordToGame = true
 MaxMessageLength = 500
+
+[Commands]
+## Comma-separated Discord role IDs. Empty denies all moderation commands.
+AllowedRoleIds =
